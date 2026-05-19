@@ -25,7 +25,7 @@ dotenv.config({ path: path.join(projectRoot, 'backend', '.env') });
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
-const PORT = 3002; // Switching to 3002 to avoid conflicts with 3001
+const PORT = process.env.PORT || 3001;
 const frontendOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 app.use(
