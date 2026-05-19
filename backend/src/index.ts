@@ -15,8 +15,17 @@ import { errorHandler } from './middleware/auth';
 import { slaService } from './services/slaService';
 import { buildNotificationEmail } from './services/notificationService';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, '../..');
+// Support for ESM and CJS bundling
+const getProjectRoot = () => {
+  if (typeof __dirname !== 'undefined') {
+    // CJS (Production bundled)
+    return path.resolve(__dirname, '../..');
+  }
+  // ESM (Development/tsx)
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+};
+
+const projectRoot = getProjectRoot();
 
 dotenv.config({ path: path.join(projectRoot, '.env') });
 dotenv.config({ path: path.join(projectRoot, 'backend', '.env') });
