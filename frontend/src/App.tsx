@@ -22,10 +22,7 @@ import { CreateIncidentDialog } from "./components/CreateIncidentDialog";
 import { IncidentDetailView } from "./components/IncidentDetailView";
 import { AdminSettings } from "./components/AdminSettings";
 import { importExportService } from "./services/importExportService";
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
-  ResponsiveContainer 
-} from "recharts";
+import { IncidentVelocityChart } from "./components/IncidentVelocityChart";
 
 // Utility for colors
 const SEVERITY_COLORS = {
@@ -49,6 +46,7 @@ export default function App() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [apiOffline, setApiOffline] = useState(false);
   const [theme, setTheme] = useState<'cyber' | 'light' | 'midnight'>('cyber');
 
   useEffect(() => {
@@ -56,10 +54,22 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const unsubscribe = incidentService.subscribeToIncidents((data) => {
-      setIncidents(data);
-      setLoading(false);
-    });
+    let apiErrorShown = false;
+    const unsubscribe = incidentService.subscribeToIncidents(
+      (data) => {
+        setIncidents(data);
+        setLoading(false);
+        setApiOffline(false);
+      },
+      (err) => {
+        setLoading(false);
+        setApiOffline(true);
+        if (!apiErrorShown) {
+          apiErrorShown = true;
+          toast.error(err.message, { duration: 8000 });
+        }
+      }
+    );
     return () => unsubscribe();
   }, []);
 
@@ -101,6 +111,12 @@ export default function App() {
   return (
     <div className="min-h-screen transition-colors duration-300">
       <Toaster position="top-right" theme={theme === 'light' ? 'light' : 'dark'} richColors />
+
+      {apiOffline && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-center text-sm py-2 px-4 md:ml-64">
+          API offline — start backend: <code className="font-mono bg-red-700 px-1 rounded">cd backend &amp;&amp; npm run dev</code> or from root: <code className="font-mono bg-red-700 px-1 rounded">npm run dev</code>
+        </div>
+      )}
       
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 border-r border-border bg-card z-50 hidden md:block">
@@ -157,7 +173,7 @@ export default function App() {
                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white">ADM</div>
                  <div>
                     <p className="text-xs font-bold">SOC Lead Admin</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">unlimitedstorage84@gmail.com</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">admin@guardiansoc.local</p>
                  </div>
               </div>
            </div>
@@ -298,20 +314,11 @@ function DashboardView({ incidents, stats, onViewTickets, onSelectIncident, onEx
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 bg-card border-border p-6 h-[400px]">
-          <div className="flex justify-between items-start mb-6">
+        <Card className="lg:col-span-2 bg-card border-border p-6">
+          <div className="flex justify-between items-start mb-4">
             <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Incident Velocity</CardTitle>
           </div>
-          <ResponsiveContainer width="100%" height="80%">
-            <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.05} vertical={false} />
-              <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.15} fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="currentColor" strokeOpacity={0.15} fontSize={10} axisLine={false} tickLine={false} />
-              <RechartsTooltip contentStyle={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", fontSize: "10px", color: "var(--foreground)" }} />
-              <Area type="monotone" dataKey="open" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.1} />
-              <Area type="monotone" dataKey="closed" stroke="#22c55e" fill="#22c55e" fillOpacity={0.05} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <IncidentVelocityChart data={chartData} />
         </Card>
 
         <Card className="bg-card border-border p-6">

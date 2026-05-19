@@ -72,6 +72,12 @@
     --muted: var(--muted);
     --secondary: var(--secondary-bg);
     --secondary-foreground: var(--foreground);
+    --popover: var(--card-bg);
+    --popover-foreground: var(--foreground);
+    --accent: var(--secondary-bg);
+    --accent-foreground: var(--foreground);
+    --input: var(--card-border);
+    --ring: var(--primary);
   }
 }
 

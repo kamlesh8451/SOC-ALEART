@@ -1,0 +1,32 @@
+{
+  "name": "guardiansoc-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "init-db": "tsx scripts/init-db.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start:prod": "node dist/server.cjs",
+    "install:all": "npm install && cd ../frontend && npm install",
+    "dev:full": "cd .. && npm run dev"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "multer": "^2.1.1",
+    "pg": "^8.21.0",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^22.14.0",
+    "@types/pg": "^8.20.0",
+    "@types/uuid": "^10.0.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2"
+  }
+}

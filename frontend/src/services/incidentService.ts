@@ -1,5 +1,6 @@
 import { Incident, Severity } from "../types";
 import { adminService } from "./adminService";
+import { apiJson } from "./apiClient";
 
 export const incidentService = {
   // Audit logging helper
@@ -26,14 +27,11 @@ export const incidentService = {
       assignedTo: data.assignedTo || assignment?.name || "Unassigned",
     };
 
-    const response = await fetch("/api/incidents", {
+    return apiJson("/api/incidents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
-    if (!response.ok) throw new Error("Failed to create incident");
-    return response.json();
   },
 
   // Update incident status
@@ -118,21 +116,38 @@ export const incidentService = {
   },
 
   // Real-time listener (simulated with polling)
-  subscribeToIncidents(callback: (incidents: Incident[]) => void) {
-    const fetchIncidents = async () => {
+  subscribeToIncidents(
+    callback: (incidents: Incident[]) => void,
+    onError?: (error: Error) => void
+  ) {
+    let cancelled = false;
+    let delayMs = 5000;
+    let errorNotified = false;
+
+    const poll = async () => {
+      if (cancelled) return;
       try {
-        const response = await fetch("/api/incidents");
-        if (response.ok) {
-          const data = await response.json();
-          callback(data);
-        }
+        const data = await apiJson<Incident[]>("/api/incidents");
+        delayMs = 5000;
+        errorNotified = false;
+        callback(data);
       } catch (error) {
-        console.error("Failed to fetch incidents:", error);
+        const err = error instanceof Error ? error : new Error("Failed to fetch incidents");
+        delayMs = 15000;
+        if (!errorNotified) {
+          errorNotified = true;
+          console.warn("Failed to fetch incidents:", err.message);
+          onError?.(err);
+        }
+      }
+      if (!cancelled) {
+        setTimeout(poll, delayMs);
       }
     };
 
-    fetchIncidents();
-    const interval = setInterval(fetchIncidents, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
+    poll();
+    return () => {
+      cancelled = true;
+    };
   }
 };

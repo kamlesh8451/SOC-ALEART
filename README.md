@@ -1,58 +1,93 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# GuardianSOC
 
-# GuardianSOC Dashboard
+Enterprise SOC incident management platform — React frontend, Express API, PostgreSQL (Aiven).
 
-A Security Operations Center dashboard migrated to PostgreSQL.
+**No Firebase. No AI Studio. Runs entirely on your machine.**
 
-## Run Locally
+## Project layout
 
-**Prerequisites:** Node.js (v18+)
+```
+guardiansoc/
+├── backend/     # Express REST API (port 3001)
+├── frontend/    # Vite + React UI (port 5173)
+└── .env         # Your secrets (not committed)
+```
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+## Quick start
 
-2. **Configure Environment:**
-   Ensure your `.env` file contains the `DATABASE_URL` (I have already created this for you with your Aiven PostgreSQL string):
-   ```env
-   DATABASE_URL=postgres://avnadmin:...@pg-...aivencloud.com:12639/defaultdb?sslmode=require
-   ```
+> Run workspace commands from the **project root** (`guardiansoc/`), not from `backend/` or `frontend/`.
 
-3. **Initialize Database:**
-   If you haven't already, run the schema initialization script:
-   ```bash
-   npx tsx scripts/init-db.ts
-   ```
-   *Note: If you encounter SSL/TLS errors on Windows, run:*
-   `$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npx tsx scripts/init-db.ts`
+### 1. Install
 
-4. **Start the App:**
-   ```bash
-   npm run dev
-   ```
-   The app will be available at `http://localhost:3000`.
+```bash
+cd C:\Users\kamle\guardiansoc
+npm run install:all
+```
 
-## Deployment (Go Live)
+From `backend/` only: `npm run install:all` installs backend + frontend deps (root deps still need `npm install` in the parent folder once).
 
-The easiest way to take this app live is using **Render** or **Railway**.
+### 2. Configure database
 
-### Option 1: Render.com (Recommended)
-1.  **Push your code to GitHub.**
-2.  Log in to [Render](https://render.com).
-3.  Click **New +** > **Web Service**.
-4.  Connect your GitHub repository.
-5.  Set the following settings:
-    *   **Runtime:** `Node`
-    *   **Build Command:** `npm install && npm run build`
-    *   **Start Command:** `node dist/server.cjs`
-6.  Add **Environment Variables**:
-    *   `DATABASE_URL`: (Your Aiven PostgreSQL URL)
-    *   `NODE_ENV`: `production`
+Copy `.env.example` to `.env` in the project root and set your Aiven `DATABASE_URL`:
 
-### Option 2: Docker
-If you prefer Docker, I have included a `Dockerfile`.
-1.  Build: `docker build -t guardiansoc .`
-2.  Run: `docker run -p 3000:3000 -e DATABASE_URL="your_url" guardiansoc`
+```env
+DATABASE_URL=postgres://user:password@host:port/defaultdb?sslmode=require
+PORT=3001
+FRONTEND_URL=http://localhost:5173
+APP_URL=http://localhost:3001
+```
+
+### 3. Initialize schema
+
+```bash
+npm run init-db
+```
+
+On Windows, if SSL errors occur:
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run init-db
+```
+
+### 4. Run locally
+
+```bash
+npm run dev
+```
+
+| Service   | URL |
+|-----------|-----|
+| Dashboard | http://localhost:5173 |
+| API       | http://localhost:3001 |
+| Health    | http://localhost:3001/api/health |
+
+## Features (current)
+
+- Incident CRUD with severity-based SLA (24h / 48h / 72h)
+- Background SLA monitor (warnings + breach flags)
+- Keyword routing rules (exact, regex, fuzzy) with priority
+- Users, roles, assignment rules (Admin tab)
+- Evidence upload (local `backend/uploads/`)
+- Email action links (`/api/tickets/confirm-action`)
+- Audit logging, host-based correlation
+- CSV import/export, themes (Cyber / Midnight / Light)
+
+## Production build
+
+```bash
+npm run build
+npm run start
+```
+
+Serves API + built frontend from `frontend/dist` when present.
+
+## Docker
+
+```bash
+docker build -t guardiansoc .
+docker run -p 3001:3001 -e DATABASE_URL="your_url" -e NODE_ENV=production guardiansoc
+```
+
+## Security note
+
+Never commit `.env` or database passwords. Rotate credentials if they were shared in chat logs.

@@ -22,6 +22,13 @@ import { adminService } from "../services/adminService";
 import { UserProfile, AssignmentRule, UserRole, RoleDefinition } from "../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -575,18 +582,27 @@ export function AdminSettings() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 min-w-0">
                         <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Matching Strategy</label>
-                        <select 
-                          value={newRule.matchingStrategy} 
-                          onChange={e => setNewRule({...newRule, matchingStrategy: e.target.value as any})}
-                          className="w-full bg-secondary border border-border rounded-md p-2.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                        <Select
+                          value={newRule.matchingStrategy || 'exact'}
+                          onValueChange={(v) =>
+                            setNewRule({
+                              ...newRule,
+                              matchingStrategy: v as AssignmentRule['matchingStrategy'],
+                            })
+                          }
                         >
-                          <option value="exact">Exact (Includes)</option>
-                          <option value="regex">Regex (Pattern)</option>
-                          <option value="fuzzy">Fuzzy (All Words)</option>
-                        </select>
+                          <SelectTrigger className="w-full h-10 bg-secondary border-border text-foreground text-xs">
+                            <SelectValue placeholder="Choose strategy" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground z-[200]">
+                            <SelectItem value="exact">Exact (Includes)</SelectItem>
+                            <SelectItem value="regex">Regex (Pattern)</SelectItem>
+                            <SelectItem value="fuzzy">Fuzzy (All Words)</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Priority (Higher = First)</label>
@@ -614,20 +630,41 @@ export function AdminSettings() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Assign Direct to</label>
-                      <select 
-                        value={newRule.assignedToUserId} 
-                        onChange={e => {
-                          const user = users.find(u => u.id === e.target.value);
-                          setNewRule({...newRule, assignedToUserId: e.target.value, assignedToUserName: user?.name || ''});
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Assign Direct To</label>
+                      <Select
+                        value={newRule.assignedToUserId || undefined}
+                        onValueChange={(userId) => {
+                          const user = users.find((u) => u.id === userId);
+                          setNewRule({
+                            ...newRule,
+                            assignedToUserId: userId,
+                            assignedToUserName: user?.name || '',
+                          });
                         }}
-                        className="w-full bg-secondary border border-border rounded-md p-2.5 text-xs text-foreground outline-none"
                       >
-                        <option value="">Select Target...</option>
-                        {users.map(u => (
-                          <option key={u.id} value={u.id}>{u.name} [{u.role}]</option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="w-full h-10 bg-secondary border-border text-foreground text-xs">
+                          <SelectValue placeholder="Select target operative..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border text-foreground z-[200]">
+                          {users.length === 0 ? (
+                            <SelectItem value="__none" disabled>
+                              No operatives — add a user first
+                            </SelectItem>
+                          ) : (
+                            users.map((u) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.name} [{u.role}]
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {users.length === 0 && (
+                        <p className="text-[8px] text-amber-500/90 flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                          Provision at least one user under Operatives before creating routes.
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Button onClick={handleCreateRule} disabled={loading} className="w-full bg-primary hover:opacity-90 text-white font-bold uppercase tracking-widest text-[10px] h-11 mt-6 shadow-lg shadow-primary/20">
