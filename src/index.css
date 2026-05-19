@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", var(--font-sans);
+  
+  --color-background: var(--bg);
+  --color-foreground: var(--foreground);
+  --color-border: var(--card-border);
+  --color-primary: var(--primary);
+  --color-muted: var(--muted);
+  --color-secondary: var(--secondary-bg);
+  --color-accent: var(--primary);
+  --color-card: var(--card-bg);
+  --color-ring: var(--primary);
+}
+
+:root {
+  --bg: #0A0A0A;
+  --foreground: #FFFFFF;
+  --primary: #EF4444; 
+  --primary-glow: rgba(239, 68, 68, 0.2);
+  --card-bg: #0F0F0F;
+  --card-border: rgba(255, 255, 255, 0.05);
+  --secondary-bg: rgba(255, 255, 255, 0.05);
+  --muted: #666666;
+}
+
+[data-theme="cyber"] {
+  --bg: #0A0A0A;
+  --foreground: #FFFFFF;
+  --primary: #EF4444; 
+  --primary-glow: rgba(239, 68, 68, 0.2);
+  --card-bg: #0F0F0F;
+  --card-border: rgba(255, 255, 255, 0.05);
+  --secondary-bg: rgba(255, 255, 255, 0.05);
+  --muted: #666666;
+}
+
+[data-theme="light"] {
+  --bg: #F8F9FA;
+  --foreground: #1A1A1A;
+  --primary: #EF4444;
+  --primary-glow: rgba(239, 68, 68, 0.1);
+  --card-bg: #FFFFFF;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --secondary-bg: rgba(0, 0, 0, 0.04);
+  --muted: #888888;
+}
+
+[data-theme="midnight"] {
+  --bg: #050B14;
+  --foreground: #E0E7FF;
+  --primary: #3B82F6; 
+  --primary-glow: rgba(59, 130, 246, 0.2);
+  --card-bg: #0E1627;
+  --card-border: rgba(59, 130, 246, 0.1);
+  --secondary-bg: rgba(59, 130, 246, 0.05);
+  --muted: #94A3B8;
+}
+
+@layer base {
+  :root, [data-theme] {
+    --background: var(--bg);
+    --foreground: var(--foreground);
+    --card: var(--card-bg);
+    --card-foreground: var(--foreground);
+    --border: var(--card-border);
+    --primary: var(--primary);
+    --muted: var(--muted);
+    --secondary: var(--secondary-bg);
+    --secondary-foreground: var(--foreground);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/30;
+  }
+  html {
+    @apply font-sans;
+  }
+}
