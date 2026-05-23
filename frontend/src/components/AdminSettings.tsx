@@ -61,7 +61,8 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'rules' | 'roles' | 'mail'>('users');
+  const [featureFlags, setFeatureFlags] = useState<Array<{ name: string, is_enabled: boolean, description: string }>>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'rules' | 'roles' | 'mail' | 'features'>('users');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // Track specific action loading
   const [searchFilter, setSearchFilter] = useState('');
@@ -87,12 +88,32 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
     const unsubUsers = adminService.subscribeToUsers(setUsers);
     const unsubRules = adminService.subscribeToRules(setRules);
     const unsubRoles = adminService.subscribeToRoles(setRoles);
+    fetchFeatureFlags();
     return () => {
       unsubUsers();
       unsubRules();
       unsubRoles();
     };
   }, []);
+
+  const fetchFeatureFlags = async () => {
+    try {
+      const flags = await adminService.getFeatureFlags();
+      setFeatureFlags(flags);
+    } catch (e) {
+      console.error("Failed to fetch feature flags");
+    }
+  };
+
+  const handleToggleFeature = async (name: string, currentStatus: boolean) => {
+    try {
+      await adminService.updateFeatureFlag(name, !currentStatus);
+      toast.success(`Feature ${name} updated`);
+      fetchFeatureFlags();
+    } catch (e) {
+      toast.error("Failed to update feature");
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'mail') {
@@ -384,7 +405,8 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
             { id: 'users', label: 'Operatives', icon: Users },
             { id: 'roles', label: 'Roles & Perms', icon: Key },
             { id: 'rules', label: 'Tactical Routing', icon: Database },
-            { id: 'mail', label: 'Mail Automation', icon: Mail }
+            { id: 'mail', label: 'Mail Automation', icon: Mail },
+            { id: 'features', label: 'Advanced Features', icon: Zap }
           ].map(tab => (
             <button 
               key={tab.id}
@@ -1078,78 +1100,57 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
                 </div>
               ))}
               
-              {activeTab === 'mail' && (
+              {activeTab === 'features' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                       <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Automation Registry</h3>
-                       <Badge variant="outline" className="text-[8px] h-4 border-green-500/30 text-green-500 bg-green-500/5">
-                         {mailSettings.is_active ? 'STREAMS_ACTIVE' : 'STREAMS_PAUSED'}
-                       </Badge>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={fetchMailData} className="text-[9px] font-bold uppercase h-7 gap-2">
-                      <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
-                      Refresh Logs
-                    </Button>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Advanced System Modules</h3>
                   </div>
 
-                  <div className="space-y-3">
-                    {mailLogs.map((log) => (
-                      <div key={log.id} className="p-4 bg-background border border-border rounded-lg group hover:border-primary/20 transition-all">
-                        <div className="flex items-center justify-between mb-2">
-                           <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "p-2 rounded bg-secondary text-muted-foreground",
-                                log.processed_status === 'CREATED' && "text-green-500 bg-green-500/10",
-                                log.processed_status === 'APPENDED' && "text-blue-500 bg-blue-500/10",
-                                log.processed_status === 'ERROR' && "text-red-500 bg-red-500/10"
-                              )}>
-                                <Mail className="w-3.5 h-3.5" />
-                              </div>
-                              <div>
-                                 <h4 className="text-sm font-bold text-foreground truncate max-w-[400px]">{log.subject}</h4>
-                                 <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{log.sender}</p>
-                              </div>
-                           </div>
-                           <div className="text-right">
-                              <Badge variant="secondary" className="text-[8px] uppercase font-bold tracking-tighter mb-1 block">
-                                {log.processed_status}
-                              </Badge>
-                              <p className="text-[9px] text-muted-foreground flex items-center gap-1 justify-end">
-                                <Clock className="w-2.5 h-2.5" />
-                                {new Date(log.received_at).toLocaleTimeString()}
-                              </p>
-                           </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    {featureFlags.map((feature) => (
+                      <div key={feature.name} className="p-5 bg-background border border-border rounded-lg flex items-center justify-between hover:border-primary/20 transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center border transition-all",
+                            feature.is_enabled ? "bg-primary/10 border-primary/20 text-primary shadow-lg shadow-primary/5" : "bg-secondary/50 border-border text-muted-foreground"
+                          )}>
+                            <Shield className={cn("w-6 h-6", feature.is_enabled && "animate-pulse")} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-foreground uppercase tracking-tighter flex items-center gap-2">
+                              {feature.name.replace(/_/g, ' ')}
+                              {feature.is_enabled && <Badge className="bg-primary/10 text-primary border-primary/20 text-[7px] h-3.5 px-1 font-black">ACTIVE</Badge>}
+                            </h4>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[400px]">{feature.description}</p>
+                          </div>
                         </div>
-                        {log.incident_id && (
-                          <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                                <FileText className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-[10px] text-muted-foreground uppercase font-bold">Associated Incident ID:</span>
-                                <code className="text-[9px] bg-secondary px-1.5 py-0.5 rounded font-mono">{log.incident_id.slice(0, 13)}...</code>
-                             </div>
-                             <button 
-                               onClick={() => onViewIncident?.(log.incident_id)}
-                               className="text-[9px] font-bold text-primary hover:underline uppercase"
-                             >
-                               View Incident
-                             </button>
-                          </div>
-                        )}
-                        {log.error_details && (
-                          <div className="mt-2 p-2 bg-red-500/5 border border-red-500/10 rounded text-[9px] text-red-400 font-mono">
-                            {log.error_details}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <span className={cn("text-[9px] font-bold uppercase tracking-widest", feature.is_enabled ? "text-primary" : "text-muted-foreground")}>
+                            {feature.is_enabled ? 'ENABLED' : 'DISABLED'}
+                          </span>
+                          <button 
+                            onClick={() => handleToggleFeature(feature.name, feature.is_enabled)}
+                            className={cn(
+                              "w-12 h-6 rounded-full relative transition-all duration-300 shadow-inner",
+                              feature.is_enabled ? "bg-primary" : "bg-secondary border border-border"
+                            )}
+                          >
+                            <div className={cn(
+                              "absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm",
+                              feature.is_enabled ? "left-7" : "left-1"
+                            )} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     
-                    {mailLogs.length === 0 && (
-                       <div className="p-20 text-center border-2 border-dashed border-border rounded-xl">
-                          <Mail className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-50" />
-                          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No Processing History</h3>
-                          <p className="text-xs text-muted-foreground/60 mt-1">Incoming security alerts will appear here once the connection is established.</p>
-                       </div>
+                    {featureFlags.length === 0 && (
+                      <div className="p-20 text-center border-2 border-dashed border-border rounded-xl">
+                        <Zap className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-30" />
+                        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No Experimental Modules</h3>
+                        <p className="text-xs text-muted-foreground/60 mt-1">Advanced system features will appear here for command override.</p>
+                      </div>
                     )}
                   </div>
                 </div>

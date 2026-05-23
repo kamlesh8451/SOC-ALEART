@@ -132,12 +132,23 @@ export const incidentService = {
   async getStats() {
     return apiJson<{
       open: number;
+      investigating: number;
       closed: number;
       critical: number;
+      high: number;
+      medium: number;
+      low: number;
       total: number;
       compliance: number;
       velocity: Array<{ name: string; open: number; closed: number }>;
     }>("/api/incidents/stats");
+  },
+
+  async getAnalytics() {
+    return apiJson<{
+      mtta: number;
+      mttr: number;
+    }>("/api/incidents/analytics");
   },
 
   async exportAll() {
@@ -162,6 +173,20 @@ export const incidentService = {
     const a = document.createElement('a');
     a.href = url;
     a.download = `incident_${ticketNumber}_report.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  async getHandoverReport() {
+    const response = await apiFetch("/api/reports/handover");
+    if (!response.ok) throw new Error("Failed to generate shift handover report");
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shift_handover_${new Date().toISOString().split('T')[0]}.pdf`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

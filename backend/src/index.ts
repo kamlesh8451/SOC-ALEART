@@ -14,6 +14,7 @@ import auditRoutes from './routes/auditRoutes';
 import ticketRoutes from './routes/ticketRoutes';
 import mailRoutes from './routes/mailRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import reportRoutes from './routes/reportRoutes';
 import { errorHandler, authenticate } from './middleware/auth';
 import { slaService } from './services/slaService';
 import { EmailIngestionService } from './services/EmailIngestionService';
@@ -77,6 +78,7 @@ app.use('/api/audit-logs', authenticate, auditRoutes);
 app.use('/api/tickets', authenticate, ticketRoutes);
 app.use('/api/mail', authenticate, mailRoutes);
 app.use('/api/settings', authenticate, settingsRoutes);
+app.use('/api/reports', authenticate, reportRoutes);
 
 app.post('/api/notifications/simulate-email', (req, res) => {
   try {
@@ -127,6 +129,24 @@ async function ensureSchemaCompatibility() {
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS assigned_to_user_id TEXT");
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'MANUAL'");
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb");
+    await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS acknowledged_at BIGINT");
+    await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolved_at BIGINT");
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS feature_flags (
+        name TEXT PRIMARY KEY,
+        is_enabled BOOLEAN DEFAULT FALSE,
+        description TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      INSERT INTO feature_flags (name, is_enabled, description)
+      VALUES ('graph_intelligence', TRUE, 'Visual link analysis of hosts, IPs, and related incidents')
+      ON CONFLICT (name) DO NOTHING
+    `);
+
     console.log('[SYS] Database schema compatibility checks completed');
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

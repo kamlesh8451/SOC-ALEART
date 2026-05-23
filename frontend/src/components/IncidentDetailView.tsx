@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Incident } from "../types";
 import { incidentService } from "../services/incidentService";
+import { adminService } from "../services/adminService";
+import { VisualLinkAnalysis } from "./VisualLinkAnalysis";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
@@ -39,6 +41,7 @@ export function IncidentDetailView({
   const [rootCause, setRootCause] = useState("");
   const [relatedIncidents, setRelatedIncidents] = useState<Incident[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [featureFlags, setFeatureFlags] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchRelated = async () => {
@@ -59,9 +62,24 @@ export function IncidentDetailView({
       }
     };
 
+    const fetchFlags = async () => {
+      try {
+        const flags = await adminService.getFeatureFlags();
+        setFeatureFlags(flags);
+      } catch (e) {
+        console.error("Failed to fetch flags");
+      }
+    };
+
     fetchRelated();
     fetchLogs();
+    fetchFlags();
   }, [incident.id]);
+
+  const isFeatureEnabled = (name: string) => {
+    const flag = featureFlags.find(f => f.name === name);
+    return flag ? flag.is_enabled : false;
+  };
 
   const handleExportReport = async () => {
     setExporting(true);
@@ -343,6 +361,76 @@ export function IncidentDetailView({
               )}
             </CardContent>
           </Card>
+
+          {/* Visual Link Analysis Section (Conditional) */}
+          {isFeatureEnabled('graph_intelligence') && (
+            <Card className="bg-card border-border border-t-2 border-t-cyan-500/30">
+              <CardHeader className="py-4 border-b border-border flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-cyan-500" />
+                  <CardTitle className="text-sm font-display font-bold uppercase tracking-widest text-foreground/80">Neural Correlation Graph</CardTitle>
+                </div>
+                <Badge variant="outline" className="text-[9px] border-cyan-500/30 text-cyan-500 uppercase font-black">
+                  LIVE_GRAPH
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-4">
+                <VisualLinkAnalysis incident={incident} relatedIncidents={relatedIncidents} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Threat Intelligence Enrichment Section */}
+          {incident.metadata?.threatIntel && (
+            <Card className="bg-card border-border border-t-2 border-t-red-500/30">
+              <CardHeader className="py-4 border-b border-border flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-red-500" />
+                  <CardTitle className="text-sm font-display font-bold uppercase tracking-widest text-foreground/80">Threat Intelligence Enrichment</CardTitle>
+                </div>
+                <Badge variant="outline" className="text-[9px] border-red-500/30 text-red-500 uppercase font-black">
+                  AUTO_ENRICHED
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border">
+                  {incident.metadata.threatIntel.indicators.map((indicator: any, idx: number) => (
+                    <div key={idx} className="p-4 flex items-center justify-between hover:bg-red-500/5 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded flex items-center justify-center font-bold text-[10px]",
+                          indicator.score > 70 ? "bg-red-500/20 text-red-500" : 
+                          indicator.score > 40 ? "bg-orange-500/20 text-orange-500" : 
+                          "bg-green-500/20 text-green-500"
+                        )}>
+                          {indicator.score}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground/90 font-mono tracking-tight">{indicator.value}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                            {indicator.type} • {indicator.provider}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className={cn(
+                        "text-[9px] h-4 font-black px-1.5 border-none",
+                        indicator.score > 70 ? "bg-red-500" : 
+                        indicator.score > 40 ? "bg-orange-500" : 
+                        "bg-green-500"
+                      )}>
+                        {indicator.score > 70 ? "MALICIOUS" : indicator.score > 40 ? "SUSPICIOUS" : "CLEAN"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-3 bg-secondary/30 border-t border-border">
+                  <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+                    {incident.metadata.threatIntel.summary}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Actions & Evidence */}

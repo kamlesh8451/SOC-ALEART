@@ -7,6 +7,7 @@ router.get('/', incidentController.getAll);
 router.get('/export', incidentController.exportAll);
 router.post('/import', incidentController.importCsv);
 router.get('/stats', incidentController.getStats);
+router.get('/analytics', incidentController.getAnalytics);
 router.post('/', incidentController.create);
 router.get('/:id/export', incidentController.exportOne);
 router.patch('/:id', incidentController.update);

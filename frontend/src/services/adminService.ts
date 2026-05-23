@@ -116,6 +116,19 @@ export const adminService = {
     return () => clearInterval(interval);
   },
 
+  // Feature Flags
+  async getFeatureFlags() {
+    return apiJson<Array<{ name: string, is_enabled: boolean, description: string }>>("/api/settings/features");
+  },
+
+  async updateFeatureFlag(name: string, isEnabled: boolean) {
+    return apiJson(`/api/settings/features/${name}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isEnabled }),
+    });
+  },
+
   // Logic to find assignment for an incident
   async getAssignmentForIncident(alertName: string, description: string): Promise<{ id: string, name: string } | null> {
     try {

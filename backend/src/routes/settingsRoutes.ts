@@ -9,4 +9,7 @@ router.get('/mailbox', authorize(['all']), settingsController.getMailboxSettings
 router.post('/mailbox', authorize(['all']), settingsController.createMailboxSettings);
 router.patch('/mailbox/:id', authorize(['all']), settingsController.updateMailboxSettings);
 
+router.get('/features', authorize(['all']), settingsController.getFeatureFlags);
+router.patch('/features/:name', authorize(['all']), settingsController.updateFeatureFlag);
+
 export default router;

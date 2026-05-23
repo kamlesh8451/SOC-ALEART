@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     correlation_id TEXT,
     assigned_to TEXT,
     assigned_to_user_id TEXT,
+    acknowledged_at BIGINT,
+    resolved_at BIGINT,
     escalation_history JSONB DEFAULT '[]'::jsonb,
     sla_warning_sent BOOLEAN DEFAULT FALSE,
     sla_breached_sent BOOLEAN DEFAULT FALSE,
@@ -138,6 +140,17 @@ CREATE TABLE IF NOT EXISTS mailbox_settings (
     poll_interval INTEGER DEFAULT 60,
     is_active BOOLEAN DEFAULT TRUE
 );
+
+CREATE TABLE IF NOT EXISTS feature_flags (
+    name TEXT PRIMARY KEY,
+    is_enabled BOOLEAN DEFAULT FALSE,
+    description TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO feature_flags (name, is_enabled, description)
+VALUES ('graph_intelligence', TRUE, 'Visual link analysis of hosts, IPs, and related incidents')
+ON CONFLICT (name) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS audit_logs (
     id SERIAL PRIMARY KEY,

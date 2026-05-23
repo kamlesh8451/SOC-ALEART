@@ -74,5 +74,38 @@ export const settingsController = {
     } catch (err) {
       next(err);
     }
+  },
+
+  async getFeatureFlags(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await pool.query('SELECT name, is_enabled, description FROM feature_flags');
+      res.json(result.rows);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async updateFeatureFlag(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { name } = req.params;
+      const { isEnabled } = req.body;
+
+      await pool.query(
+        'UPDATE feature_flags SET is_enabled = $1, updated_at = CURRENT_TIMESTAMP WHERE name = $2',
+        [isEnabled, name]
+      );
+
+      await auditService.logAction(
+        'UPDATE_FEATURE_FLAG',
+        undefined,
+        undefined,
+        `Set feature ${name} to ${isEnabled}`,
+        req.headers['x-user-id'] as string
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
   }
 };

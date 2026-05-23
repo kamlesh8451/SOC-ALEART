@@ -3,6 +3,7 @@ import pool from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 import { auditService } from '../services/auditService';
 import { getAssignmentForIncident } from '../services/assignmentService';
+import { ThreatIntelService } from '../services/threatIntelService';
 import PDFDocument from 'pdfkit';
 
 function mapIncident(row: Record<string, any>) {
@@ -25,6 +26,8 @@ function mapIncident(row: Record<string, any>) {
       correlationId: row.correlation_id || null,
       assignedTo: row.assigned_to || 'Unassigned',
       assignedToUserId: row.assigned_to_user_id || null,
+      acknowledgedAt: row.acknowledged_at ? Number(row.acknowledged_at) : null,
+      resolvedAt: row.resolved_at ? Number(row.resolved_at) : null,
       escalationHistory: row.escalation_history || [],
       slaWarningSent: !!row.sla_warning_sent,
       slaBreachedSent: !!row.sla_breached_sent,
@@ -133,6 +136,9 @@ export const incidentController = {
         req.headers['x-user-id'] as string
       );
 
+      // Automated Threat Intelligence Enrichment
+      ThreatIntelService.enrichIncident(id, `${data.alertName} ${data.description || ''}`);
+
       res.status(201).json({
         id,
         ticketNumber,
@@ -159,12 +165,29 @@ export const incidentController = {
         'extensionReason', 'rootCause', 'closureComment'
       ]);
 
+      // Fetch current state to check for transitions
+      const currentRes = await pool.query('SELECT status, acknowledged_at, detection_time FROM incidents WHERE id = $1', [id]);
+      if (currentRes.rows.length === 0) return res.status(404).json({ error: 'Incident not found' });
+      const current = currentRes.rows[0];
+
       const fields: string[] = [];
       const values: unknown[] = [];
       let i = 1;
 
+      // Logic for MTTA (Acknowledge)
+      if (updates.status === 'investigating' && current.status === 'open' && !current.acknowledged_at) {
+        updates.acknowledgedAt = Date.now();
+      } else if (updates.ownerId && updates.ownerId !== 'unassigned' && !current.acknowledged_at) {
+        updates.acknowledgedAt = Date.now();
+      }
+
+      // Logic for MTTR (Resolve)
+      if (updates.status === 'closed' && current.status !== 'closed') {
+        updates.resolvedAt = Date.now();
+      }
+
       for (const [key, value] of Object.entries(updates)) {
-        if (!allowedFields.has(key)) continue;
+        if (!allowedFields.has(key) && key !== 'acknowledgedAt' && key !== 'resolvedAt') continue;
 
         const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
         fields.push(`${snakeKey} = $${i}`);
@@ -177,7 +200,6 @@ export const incidentController = {
       }
 
       values.push(id);
-      // Removed updated_at = NOW() to prevent 500 errors on older schemas
       const query = `UPDATE incidents SET ${fields.join(', ')} WHERE id = $${i}`;
       
       try {
@@ -186,8 +208,7 @@ export const incidentController = {
         console.error('[ERR] SQL Update Failed:', dbErr.message);
         return res.status(500).json({ 
           error: 'Database update failed', 
-          details: dbErr.message,
-          hint: 'Ensure your database schema is up to date with npm run init-db'
+          details: dbErr.message
         });
       }
 
@@ -207,6 +228,26 @@ export const incidentController = {
     } catch (err: any) {
       console.error('[CRIT] Incident Update Controller Crash:', err.message);
       res.status(500).json({ error: err.message });
+    }
+  },
+
+  async getAnalytics(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await pool.query(`
+        SELECT 
+          AVG(acknowledged_at - detection_time) / 1000 / 60 as avg_mtta_minutes,
+          AVG(resolved_at - acknowledged_at) / 1000 / 60 / 60 as avg_mttr_hours
+        FROM incidents
+        WHERE acknowledged_at IS NOT NULL
+      `);
+
+      const stats = result.rows[0];
+      res.json({
+        mtta: Math.round(parseFloat(stats.avg_mtta_minutes || '0')),
+        mttr: Math.round(parseFloat(stats.avg_mttr_hours || '0') * 10) / 10
+      });
+    } catch (err) {
+      next(err);
     }
   },
 
@@ -567,4 +608,3 @@ export const incidentController = {
     }
   },
 };
-

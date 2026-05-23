@@ -142,6 +142,19 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
         <div className="flex items-center gap-2">
           <Button 
             variant="outline"
+            onClick={() => {
+              toast.loading("Generating handover report...");
+              incidentService.getHandoverReport()
+                .then(() => { toast.dismiss(); toast.success("Handover report ready"); })
+                .catch(() => { toast.dismiss(); toast.error("Report generation failed"); });
+            }}
+            className="border-primary/20 text-primary hover:bg-primary/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Shift Report
+          </Button>
+          <Button 
+            variant="outline"
             onClick={handleExport}
             className="border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
           >
