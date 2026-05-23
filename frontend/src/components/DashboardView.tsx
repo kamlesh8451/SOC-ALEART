@@ -142,9 +142,10 @@ export const DashboardView: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Alert Severity Mix</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[300px] flex flex-col items-center justify-center min-w-0">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
+                <CardContent className="h-[300px] flex flex-col items-center justify-center min-w-0 relative">
+                  <div className="w-full h-full min-h-0 min-w-0 overflow-hidden">
+                    <ResponsiveContainer width="100%" height={240}>
+                      <PieChart>
                       <Pie
                         data={[
                           { name: 'Critical', value: stats?.critical || 0, color: '#ef4444' },

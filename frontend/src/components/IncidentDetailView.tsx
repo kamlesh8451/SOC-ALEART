@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { apiJson } from "../services/apiClient";
 
 export function IncidentDetailView({ 
   incident, 
@@ -41,11 +42,8 @@ export function IncidentDetailView({
   useEffect(() => {
     const fetchRelated = async () => {
       try {
-        const response = await fetch(`/api/incidents/${incident.id}/related`);
-        if (response.ok) {
-          const data = await response.json();
-          setRelatedIncidents(data);
-        }
+        const data = await apiJson<Incident[]>(`/api/incidents/${incident.id}/related`);
+        setRelatedIncidents(data);
       } catch (e) {
         console.error("Failed to fetch correlations", e);
       }
@@ -53,11 +51,8 @@ export function IncidentDetailView({
     
     const fetchLogs = async () => {
       try {
-        const response = await fetch(`/api/audit-logs?incidentId=${incident.id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setAuditLogs(data);
-        }
+        const data = await apiJson<any[]>(`/api/audit-logs?incidentId=${incident.id}`);
+        setAuditLogs(data);
       } catch (e) {
         console.error("Failed to fetch audit logs", e);
       }
@@ -76,7 +71,7 @@ export function IncidentDetailView({
     try {
       const userRole = role || localStorage.getItem('soc-role') || 'soc_analyst';
       
-      const response = await fetch("/api/tickets/confirm-action", {
+      await apiJson("/api/tickets/confirm-action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -86,11 +81,6 @@ export function IncidentDetailView({
           role: userRole
         }),
       });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Escalation failed");
-      }
 
       toast.success("Incident escalated to SOC Lead");
       setEscalationReason("");
@@ -111,16 +101,6 @@ export function IncidentDetailView({
   };
 
   const handleCloseTicket = async () => {
-    if (!incident.evidenceUrl) {
-      toast.error("Closure BLOCKED: Evidence URL is missing.");
-      return;
-    }
-
-    if (!isValidUrl(incident.evidenceUrl)) {
-      toast.error("Closure BLOCKED: Evidence URL is invalid or malformed.");
-      return;
-    }
-
     if (!rootCause.trim()) {
       toast.error("Closure BLOCKED: Root Cause analysis is mandatory.");
       return;
@@ -469,12 +449,9 @@ function EmailTimeline({ incidentId }: { incidentId: string }) {
   useEffect(() => {
     const fetchEmails = async () => {
       try {
-        const response = await fetch(`/api/mail/logs?incidentId=${incidentId}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Filter logs for this specific incident if backend didn't do it
-          setEmails(data.filter((e: any) => e.incident_id === incidentId));
-        }
+        const data = await apiJson<any[]>(`/api/mail/logs?incidentId=${incidentId}`);
+        // Filter logs for this specific incident if backend didn't do it
+        setEmails(data.filter((e: any) => e.incident_id === incidentId));
       } catch (e) {
         console.error("Failed to fetch email logs", e);
       } finally {
