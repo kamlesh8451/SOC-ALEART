@@ -136,48 +136,51 @@ export const DashboardView: React.FC = () => {
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center relative w-full" style={{ height: 300 }}>
                   {stats && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Critical', value: stats?.critical || 0, color: '#ef4444' },
-                            { name: 'High', value: stats?.high || 0, color: '#f97316' },
-                            { name: 'Medium', value: stats?.medium || 0, color: '#eab308' },
-                            { name: 'Low', value: stats?.low || 0, color: '#3b82f6' },
-                          ].filter(d => d.value > 0)}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {[
+                    <>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Critical', value: stats?.critical || 0, color: '#ef4444' },
+                              { name: 'High', value: stats?.high || 0, color: '#f97316' },
+                              { name: 'Medium', value: stats?.medium || 0, color: '#eab308' },
+                              { name: 'Low', value: stats?.low || 0, color: '#3b82f6' },
+                            ].filter(d => d.value > 0)}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {[
+                              { name: 'Critical', color: '#ef4444' },
+                              { name: 'High', color: '#f97316' },
+                              { name: 'Medium', color: '#eab308' },
+                              { name: 'Low', color: '#3b82f6' },
+                            ].map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="grid grid-cols-2 gap-4 mt-6 w-full">
+                         {[
                             { name: 'Critical', color: '#ef4444' },
                             { name: 'High', color: '#f97316' },
                             { name: 'Medium', color: '#eab308' },
                             { name: 'Low', color: '#3b82f6' },
-                          ].map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                          ))}
-                        </Pie>
-                        <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  <div className="grid grid-cols-2 gap-4 mt-6 w-full">
-                     {[
-                        { name: 'Critical', color: '#ef4444' },
-                        { name: 'High', color: '#f97316' },
-                        { name: 'Medium', color: '#eab308' },
-                        { name: 'Low', color: '#3b82f6' },
-                     ].map((item) => (
-                       <div key={item.name} className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                          <span className="text-[10px] font-bold text-white/70 uppercase tracking-tighter">{item.name}</span>
-                          <span className="text-[10px] text-white ml-auto">{stats?.[item.name.toLowerCase()] || 0}</span>
-                       </div>
-                     ))}
-                  </div>
+                         ].map((item) => (
+                           <div key={item.name} className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                              <span className="text-[10px] font-bold text-white/70 uppercase tracking-tighter">{item.name}</span>
+                              <span className="text-[10px] text-white ml-auto">{stats?.[item.name.toLowerCase()] || 0}</span>
+                           </div>
+                         ))}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
