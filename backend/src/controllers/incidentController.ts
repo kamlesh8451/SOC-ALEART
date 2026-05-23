@@ -550,25 +550,45 @@ export const incidentController = {
 
       const headers = lines[0].split(',').map((h: string) => h.trim());
       const results = [];
+      let skipped = 0;
 
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
 
-        // Simple CSV parser (doesn't handle quoted commas well, but for simple SOC export/import it's okay)
-        // A better one would use a regex or a lib.
         const values = line.split(',').map((v: string) => v.trim().replace(/^"|"$/g, ''));
         const data: any = {};
         headers.forEach((h: string, index: number) => {
           data[h] = values[index];
         });
 
+        const alertName = data.alertName || data.alert_name || 'Imported Alert';
+        const host = data.host || 'unknown';
+        const description = data.description || '';
+        const severity = data.severity || 'medium';
+
+        // DE-DUPLICATION LOGIC
+        // Check if an identical incident (same alert, host, and description) already exists
+        const existing = await pool.query(
+          'SELECT id FROM incidents WHERE alert_name = $1 AND host = $2 AND description = $3 LIMIT 1',
+          [alertName, host, description]
+        );
+
+        if (existing.rows.length > 0) {
+          skipped++;
+          continue;
+        }
+
         // Map fields to DB
         const id = uuidv4();
         const ticketNumber = await generateUniqueTicketNumber();
-        const now = Date.now();
-        const severity = data.severity || 'medium';
-        const slaDeadline = now + slaHoursForSeverity(severity) * 60 * 60 * 1000;
+        
+        // Use CSV detection time if provided, otherwise now
+        const detectionTime = data.detectionTime || data.detection_time 
+          ? Number(data.detectionTime || data.detection_time) 
+          : Date.now();
+          
+        const slaDeadline = detectionTime + slaHoursForSeverity(severity) * 60 * 60 * 1000;
 
         await pool.query(
           `INSERT INTO incidents (
@@ -578,11 +598,11 @@ export const incidentController = {
           [
             id,
             ticketNumber,
-            data.alertName || data.alert_name || 'Imported Alert',
+            alertName,
             severity,
-            data.host || 'unknown',
-            data.description || '',
-            now,
+            host,
+            description,
+            detectionTime,
             slaDeadline,
             data.status || 'open',
             'unassigned',
@@ -592,17 +612,20 @@ export const incidentController = {
           ]
         );
         results.push(ticketNumber);
+        
+        // Automated Threat Intelligence Enrichment for imported items too
+        ThreatIntelService.enrichIncident(id, `${alertName} ${description}`);
       }
 
       await auditService.logAction(
         'IMPORT_INCIDENTS',
         undefined,
         undefined,
-        `Imported ${results.length} incidents from CSV`,
+        `Imported ${results.length} incidents from CSV (Skipped ${skipped} duplicates)`,
         req.headers['x-user-id'] as string
       );
 
-      res.json({ success: true, count: results.length, tickets: results });
+      res.json({ success: true, count: results.length, skipped, tickets: results });
     } catch (err) {
       next(err);
     }
