@@ -461,7 +461,8 @@ export function IncidentDetailView({
                   <div key={log.id}>
                     <LogEntry 
                       user={log.userId === 'api-system' ? "System" : "Operative"} 
-                      action={`${log.action}: ${log.details}`} 
+                      action={log.action}
+                      rawDetails={log.details}
                       time={formatDistanceToNow(log.timestamp) + " ago"} 
                     />
                   </div>
@@ -539,13 +540,55 @@ function DetailItem({ icon, label, value }: { icon: React.ReactNode, label: stri
   );
 }
 
-function LogEntry({ user, action, time }: { user: string, action: string, time: string }) {
+function LogEntry({ user, action, rawDetails, time }: { user: string, action: string, rawDetails: string, time: string }) {
+  let friendlyAction = action;
+  let icon = <Shield className="w-3 h-3 text-cyan-500" />;
+  let detailsText = rawDetails;
+
+  if (action === 'CREATE_INCIDENT') {
+    friendlyAction = "Registered a new incident";
+    icon = <AlertCircle className="w-3 h-3 text-red-500" />;
+  } else if (action === 'UPDATE_INCIDENT') {
+    friendlyAction = "Modified incident parameters";
+    icon = <Edit2 className="w-3 h-3 text-blue-500" />;
+    try {
+      const parsed = JSON.parse(rawDetails);
+      if (parsed.status === 'closed') {
+        friendlyAction = "Closed the incident";
+        icon = <CheckCircle2 className="w-3 h-3 text-green-500" />;
+        detailsText = `Reason: ${parsed.closureComment || 'N/A'}`;
+      } else {
+        const keys = Object.keys(parsed).map(k => k.replace(/([A-Z])/g, ' $1').toLowerCase()).join(', ');
+        detailsText = `Updated: ${keys}`;
+      }
+    } catch(e) {}
+  } else if (action === 'ESCALATE_INCIDENT') {
+    friendlyAction = "Escalated the incident";
+    icon = <AlertTriangle className="w-3 h-3 text-orange-500" />;
+  } else if (action === 'UPLOAD_EVIDENCE') {
+    friendlyAction = "Uploaded forensic evidence";
+    icon = <FileUp className="w-3 h-3 text-purple-500" />;
+  }
+
   return (
-    <div className="flex gap-3 text-xs">
-      <div className="w-2 h-2 rounded-full bg-border mt-1" />
-      <div>
-        <p className="text-foreground/80"><span className="font-bold">{user}</span> {action}</p>
-        <p className="text-muted-foreground mt-0.5">{time}</p>
+    <div className="flex gap-3 text-xs mb-3 group">
+      <div className="flex flex-col items-center">
+        <div className="w-6 h-6 rounded-full bg-secondary/50 flex items-center justify-center border border-border group-hover:border-primary/30 transition-colors">
+          {icon}
+        </div>
+        <div className="w-[1px] h-full bg-border mt-1 group-last:hidden" />
+      </div>
+      <div className="pb-3 flex-1">
+        <p className="text-foreground/90 leading-tight">
+          <span className="font-bold text-primary mr-1">{user}</span>
+          {friendlyAction}
+        </p>
+        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono bg-secondary/30 p-1.5 rounded inline-block border border-border mt-1">
+          {detailsText}
+        </p>
+        <p className="text-[9px] text-muted-foreground/60 mt-1 uppercase tracking-widest flex items-center gap-1">
+          <Clock className="w-2 h-2" /> {time}
+        </p>
       </div>
     </div>
   );
