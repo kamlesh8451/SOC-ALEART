@@ -2,7 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { redisConnection } from '../config/redis';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-soc-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('FATAL: JWT_SECRET environment variable is not defined.');
+}
 
 export interface AuthRequest extends Request {
   user?: {
@@ -33,10 +36,10 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     req.user = decoded;
-    next();
   } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token' });
   }
+  next();
 };
 
 export const authorize = (permissions: string[]) => {

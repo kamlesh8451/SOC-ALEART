@@ -1,11 +1,22 @@
 import { apiJson } from "./apiClient";
 
+export interface MailSettings {
+  id?: number;
+  host: string;
+  port: number;
+  ssl: boolean;
+  username: string;
+  password?: string;
+  poll_interval: number;
+  is_active: boolean;
+}
+
 export const mailService = {
   async getSettings() {
-    return apiJson("/api/mail/settings");
+    return apiJson<MailSettings>("/api/mail/settings");
   },
 
-  async updateSettings(settings: any) {
+  async updateSettings(settings: MailSettings) {
     return apiJson("/api/mail/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -13,7 +24,8 @@ export const mailService = {
     });
   },
 
-  async getLogs() {
-    return apiJson("/api/mail/logs");
+  async getLogs(incidentId?: string) {
+    const url = incidentId ? `/api/mail/logs?incidentId=${incidentId}` : "/api/mail/logs";
+    return apiJson<any[]>(url);
   }
 };

@@ -50,12 +50,16 @@ export interface UserProfile {
 
 export interface AssignmentRule {
   id: string;
+  name: string;
   keyword: string;
   assignedToUserId: string;
   assignedToUserName: string;
   active: boolean;
-  matchingStrategy?: 'exact' | 'fuzzy' | 'regex';
+  matchingStrategy?: 'exact' | 'fuzzy' | 'regex' | 'contains';
   priority?: number;
+  severityOverride?: string;
+  autoSlaAssignment?: boolean;
+  sendNotifications?: boolean;
 }
 
 export interface Analytics {

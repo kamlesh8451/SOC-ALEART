@@ -63,7 +63,12 @@ app.use(express.json());
 
 // Request logger to debug 500 errors
 app.use((req, res, next) => {
+  const start = Date.now();
   console.log(`[REQ] ${req.method} ${req.url}`);
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[RES] ${req.method} ${req.url} ${res.statusCode} (${duration}ms)`);
+  });
   next();
 });
 
@@ -126,12 +131,49 @@ app.use('/api', (req, res) => {
 
 async function ensureSchemaCompatibility() {
   try {
+    // Incidents updates
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS assigned_to_user_id TEXT");
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'MANUAL'");
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb");
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS acknowledged_at BIGINT");
     await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolved_at BIGINT");
     
+    // Ensure ai_insights is JSONB
+    const checkAiInsights = await pool.query("SELECT data_type FROM information_schema.columns WHERE table_name = 'incidents' AND column_name = 'ai_insights'");
+    if (checkAiInsights.rows.length > 0 && checkAiInsights.rows[0].data_type === 'text') {
+      console.log('[SYS] Converting incidents.ai_insights from TEXT to JSONB...');
+      await pool.query("ALTER TABLE incidents ALTER COLUMN ai_insights TYPE JSONB USING ai_insights::jsonb");
+    } else {
+      await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ai_insights JSONB");
+    }
+    
+    await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS closure_comment TEXT");
+    await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS root_cause TEXT");
+    
+    // Assignment Rules updates
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT 'Unnamed Rule'");
+    await pool.query("ALTER TABLE assignment_rules ALTER COLUMN assigned_to_user_id DROP NOT NULL");
+    await pool.query("ALTER TABLE assignment_rules ALTER COLUMN assigned_to_user_name DROP NOT NULL");
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS assign_to_team TEXT");
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS severity_override TEXT");
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS auto_sla_assignment BOOLEAN DEFAULT TRUE");
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS escalation_policy TEXT");
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS send_notifications BOOLEAN DEFAULT TRUE");
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS conditions JSONB DEFAULT '[]'::jsonb");
+    await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS matching_strategy TEXT DEFAULT 'contains'");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        incident_id TEXT,
+        ticket_number TEXT,
+        details TEXT,
+        timestamp BIGINT NOT NULL
+      )
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS feature_flags (
         name TEXT PRIMARY KEY,
@@ -164,7 +206,11 @@ async function startServer() {
   try {
     await testConnection();
     console.log('[SYS] PostgreSQL connection verified');
-    await ensureSchemaCompatibility();
+    if (process.env.NODE_ENV !== 'production' || process.env.RUN_MIGRATIONS === 'true') {
+      await ensureSchemaCompatibility();
+    } else {
+      console.log('[SYS] Skipping automatic schema migrations in production.');
+    }
     slaService.startMonitor();
     EmailIngestionService.start();
     await queueService.init();

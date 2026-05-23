@@ -291,7 +291,7 @@ export const ReportsHubView: React.FC = () => {
                                       </tr>
                                    </thead>
                                    <tbody>
-                                      {previewData.indicators.map((i: any, idx: number) => (
+                                      {previewData.indicators?.map((i: any, idx: number) => (
                                         <tr key={idx} className="border-b border-border/50 text-[10px] font-mono">
                                            <td className="p-3 text-white font-bold">{i.value}</td>
                                            <td className="p-3 text-center opacity-50 uppercase">{i.type}</td>

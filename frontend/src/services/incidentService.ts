@@ -52,12 +52,6 @@ export const incidentService = {
     });
   },
 
-  // Bulk Update Status
-  async bulkUpdateStatus(ids: string[], status: Incident['status'], evidenceUrl?: string) {
-    const promises = ids.map(id => this.updateStatus(id, status, evidenceUrl));
-    await Promise.all(promises);
-  },
-
   // Escalate Incident
   async escalateIncident(id: string, reason: string) {
     return apiJson("/api/tickets/confirm-action", {
@@ -86,7 +80,7 @@ export const incidentService = {
 
   // Simulate Email Notification
   async simulateNotification(incident: Incident, type: 'alert' | 'daily_digest' | 'reminder') {
-    return apiJson('/api/notifications/simulate-email', {
+    return apiJson<{ subject: string; body: string }>('/api/notifications/simulate-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ incident, type })
@@ -194,7 +188,7 @@ export const incidentService = {
   },
 
   async importCsv(csvData: string) {
-    return apiJson("/api/incidents/import", {
+    return apiJson<{ success: boolean; count: number }>("/api/incidents/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ csvData }),
@@ -215,5 +209,10 @@ export const incidentService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids, status }),
     });
+  },
+
+  // Fetch current incident registry
+  async getIncidents() {
+    return apiJson<Incident[]>("/api/incidents");
   }
 };

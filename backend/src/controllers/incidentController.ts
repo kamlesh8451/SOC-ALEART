@@ -4,6 +4,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { auditService } from '../services/auditService';
 import { getAssignmentForIncident } from '../services/assignmentService';
 import { ThreatIntelService } from '../services/threatIntelService';
+import { SyricService } from '../services/SyricService';
+import { sendNotification } from '../services/notificationService';
+import { SocketService } from '../services/SocketService';
 import PDFDocument from 'pdfkit';
 
 function mapIncident(row: Record<string, any>) {
@@ -23,6 +26,7 @@ function mapIncident(row: Record<string, any>) {
       evidenceUrl: row.evidence_url || null,
       extensionRequested: !!row.extension_requested,
       extensionReason: row.extension_reason || null,
+      aiInsights: row.ai_insights || null,
       correlationId: row.correlation_id || null,
       assignedTo: row.assigned_to || 'Unassigned',
       assignedToUserId: row.assigned_to_user_id || null,
@@ -77,6 +81,31 @@ export const incidentController = {
     try {
       const result = await pool.query('SELECT * FROM incidents ORDER BY detection_time DESC');
       res.json(result.rows.map(mapIncident));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async getOne(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const result = await pool.query('SELECT * FROM incidents WHERE id = $1', [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Incident not found' });
+      }
+
+      const incident = mapIncident(result.rows[0]);
+
+      await auditService.logAction(
+        'VIEW_INCIDENT',
+        id,
+        incident.ticketNumber,
+        `Viewed incident details`,
+        req.headers['x-user-id'] as string
+      );
+
+      res.json(incident);
     } catch (err) {
       next(err);
     }
@@ -139,6 +168,23 @@ export const incidentController = {
       // Automated Threat Intelligence Enrichment
       ThreatIntelService.enrichIncident(id, `${data.alertName} ${data.description || ''}`);
 
+      // Automated Syric AI Analysis
+      const aiInsights = await SyricService.analyzeIncident(id);
+
+      // Automated Branded Notification
+      if (assignedToUserId) {
+        const userRes = await pool.query('SELECT email FROM users WHERE id = $1', [assignedToUserId]);
+        if (userRes.rows.length > 0) {
+          await sendNotification({
+            ...data,
+            id,
+            ticketNumber,
+            slaDeadline,
+            ai_insights: aiInsights
+          }, 'alert', userRes.rows[0].email);
+        }
+      }
+
       res.status(201).json({
         id,
         ticketNumber,
@@ -146,7 +192,60 @@ export const incidentController = {
         slaDeadline,
         assignedTo: assignedTo || 'Unassigned',
         assignedToUserId: assignedToUserId || null,
+        aiInsights
       });
+
+      // Emit real-time update
+      SocketService.emit('incidents_updated', { type: 'CREATED' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async startSyric(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const aiInsights = await SyricService.analyzeIncident(id);
+      
+      if (!aiInsights) {
+        return res.status(404).json({ error: 'Incident not found or analysis failed' });
+      }
+
+      await auditService.logAction(
+        'START_SYRIC_ANALYSIS',
+        id,
+        undefined,
+        `Manual Syric analysis triggered. Confidence: ${aiInsights.confidence}`,
+        req.headers['x-user-id'] as string
+      );
+
+      res.json(aiInsights);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const incidentRes = await pool.query('SELECT ticket_number FROM incidents WHERE id = $1', [id]);
+      if (incidentRes.rows.length === 0) return res.status(404).json({ error: 'Incident not found' });
+      const ticketNumber = incidentRes.rows[0].ticket_number;
+
+      await pool.query('DELETE FROM incidents WHERE id = $1', [id]);
+
+      await auditService.logAction(
+        'DELETE_INCIDENT',
+        id,
+        ticketNumber,
+        `Incident deleted manually`,
+        req.headers['x-user-id'] as string
+      );
+
+      // Emit real-time update
+      SocketService.emit('incidents_updated', { type: 'DELETED' });
+
+      res.json({ success: true });
     } catch (err) {
       next(err);
     }
@@ -166,7 +265,7 @@ export const incidentController = {
       ]);
 
       // Fetch current state to check for transitions
-      const currentRes = await pool.query('SELECT status, acknowledged_at, detection_time FROM incidents WHERE id = $1', [id]);
+      const currentRes = await pool.query('SELECT status, acknowledged_at, detection_time, ticket_number FROM incidents WHERE id = $1', [id]);
       if (currentRes.rows.length === 0) return res.status(404).json({ error: 'Incident not found' });
       const current = currentRes.rows[0];
 
@@ -216,13 +315,16 @@ export const incidentController = {
         await auditService.logAction(
           'UPDATE_INCIDENT',
           id,
-          undefined,
+          current.ticket_number,
           JSON.stringify(updates),
           req.headers['x-user-id'] as string
         );
       } catch (auditErr: any) {
         console.error('[WARN] Audit log failed but incident updated:', auditErr.message);
       }
+
+      // Emit real-time update
+      SocketService.emit('incidents_updated', { type: 'UPDATED', id });
 
       res.json({ success: true });
     } catch (err: any) {
@@ -247,6 +349,9 @@ export const incidentController = {
         `Deleted ${ids.length} incidents`,
         req.headers['x-user-id'] as string
       );
+
+      // Emit real-time update
+      SocketService.emit('incidents_updated', { type: 'BULK_DELETED' });
 
       res.json({ success: true });
     } catch (err) {
@@ -285,6 +390,9 @@ export const incidentController = {
         `Updated ${ids.length} incidents to ${status}`,
         req.headers['x-user-id'] as string
       );
+
+      // Emit real-time update
+      SocketService.emit('incidents_updated', { type: 'BULK_UPDATED' });
 
       res.json({ success: true });
     } catch (err) {

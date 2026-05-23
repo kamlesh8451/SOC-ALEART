@@ -70,15 +70,18 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
   
   const [newUser, setNewUser] = useState<Omit<UserProfile, 'id'>>({ email: '', name: '', role: '', permissions: [] });
-  const [newRule, setNewRule] = useState<Omit<AssignmentRule, 'id'>>({ 
-    keyword: '', 
-    assignedToUserId: '', 
-    assignedToUserName: '', 
+  const [newRule, setNewRule] = useState<Omit<AssignmentRule, 'id'>>({
+    name: '',
+    keyword: '',
+    assignedToUserId: '',
+    assignedToUserName: '',
     active: true,
     matchingStrategy: 'exact',
-    priority: 0 
-  });
-  const [newRole, setNewRole] = useState<Omit<RoleDefinition, 'id'>>({ name: '', permissions: [], description: '' });
+    priority: 0,
+    severityOverride: 'none',
+    autoSlaAssignment: true,
+    sendNotifications: true
+  });  const [newRole, setNewRole] = useState<Omit<RoleDefinition, 'id'>>({ name: '', permissions: [], description: '' });
 
   const [mailSettings, setMailSettings] = useState<any>({ host: '', port: 993, ssl: true, username: '', password: '', poll_interval: 60, is_active: true });
   const [mailLogs, setMailLogs] = useState<any[]>([]);
@@ -200,6 +203,7 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
         toast.success("Strategic routing rule established");
       }
       setNewRule({ 
+        name: '',
         keyword: '', 
         assignedToUserId: '', 
         assignedToUserName: '', 
@@ -261,6 +265,7 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
   const startEditRule = (rule: AssignmentRule) => {
     setEditingId(rule.id);
     setNewRule({ 
+      name: rule.name || '',
       keyword: rule.keyword, 
       assignedToUserId: rule.assignedToUserId, 
       assignedToUserName: rule.assignedToUserName, 
@@ -275,6 +280,7 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
     setEditingId(null);
     setNewUser({ email: '', name: '', role: '', permissions: [] });
     setNewRule({ 
+      name: '',
       keyword: '', 
       assignedToUserId: '', 
       assignedToUserName: '', 
@@ -728,6 +734,15 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
                 <>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Rule Designation (Name)</label>
+                      <Input 
+                        value={newRule.name} 
+                        onChange={e => setNewRule({...newRule, name: e.target.value})} 
+                        placeholder="e.g. Cobalt Strike Alert" 
+                        className="bg-secondary border-border h-10 text-xs font-mono" 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
                       <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Tactical Keyword / Pattern</label>
                       <Input 
                         value={newRule.keyword} 
@@ -796,12 +811,12 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Assign Direct To</label>
                       <Select
-                        value={newRule.assignedToUserId || undefined}
+                        value={newRule.assignedToUserId || "unassigned"}
                         onValueChange={(userId) => {
                           const user = users.find((u) => u.id === userId);
                           setNewRule({
                             ...newRule,
-                            assignedToUserId: userId,
+                            assignedToUserId: userId === "unassigned" ? "" : userId,
                             assignedToUserName: user?.name || '',
                           });
                         }}
@@ -811,15 +826,18 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
                         </SelectTrigger>
                         <SelectContent className="bg-card border-border text-foreground z-[200]">
                           {users.length === 0 ? (
-                            <SelectItem value="__none" disabled>
+                            <SelectItem value="unassigned" disabled>
                               No operatives — add a user first
                             </SelectItem>
                           ) : (
-                            users.map((u) => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.name} [{u.role}]
-                              </SelectItem>
-                            ))
+                            <>
+                              <SelectItem value="unassigned" disabled>Select target operative...</SelectItem>
+                              {users.map((u) => (
+                                <SelectItem key={u.id} value={u.id}>
+                                  {u.name} [{u.role}]
+                                </SelectItem>
+                              ))}
+                            </>
                           )}
                         </SelectContent>
                       </Select>

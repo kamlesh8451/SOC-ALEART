@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { adminService } from '@/services/adminService';
 import { toast } from 'sonner';
+import { AssignmentRule } from '../types';
 
 export const RoutingRulesView: React.FC = () => {
   const [rules, setRules] = useState<any[]>([]);
@@ -23,16 +24,17 @@ export const RoutingRulesView: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentRule, setCurrentRule] = useState<any>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<AssignmentRule, 'id'> & { name: string; severityOverride: string; autoSlaAssignment: boolean; sendNotifications: boolean }>({
     name: '',
     keyword: '',
-    matching_strategy: 'contains',
+    matchingStrategy: 'contains',
     priority: 0,
     active: true,
-    assigned_to_user_name: '',
-    severity_override: 'none',
-    auto_sla_assignment: true,
-    send_notifications: true
+    assignedToUserId: 'unassigned',
+    assignedToUserName: '',
+    severityOverride: 'none',
+    autoSlaAssignment: true,
+    sendNotifications: true
   });
 
   useEffect(() => {
@@ -58,26 +60,28 @@ export const RoutingRulesView: React.FC = () => {
       setFormData({
         name: rule.name || '',
         keyword: rule.keyword || '',
-        matching_strategy: rule.matching_strategy || 'contains',
+        matchingStrategy: rule.matchingStrategy || rule.matching_strategy || 'contains',
         priority: rule.priority || 0,
         active: rule.active !== undefined ? rule.active : true,
-        assigned_to_user_name: rule.assigned_to_user_name || '',
-        severity_override: rule.severity_override || 'none',
-        auto_sla_assignment: rule.auto_sla_assignment !== undefined ? rule.auto_sla_assignment : true,
-        send_notifications: rule.send_notifications !== undefined ? rule.send_notifications : true
+        assignedToUserId: rule.assignedToUserId || rule.assigned_to_user_id || 'unassigned',
+        assignedToUserName: rule.assignedToUserName || rule.assigned_to_user_name || '',
+        severityOverride: rule.severityOverride || rule.severity_override || 'none',
+        autoSlaAssignment: rule.autoSlaAssignment !== undefined ? rule.autoSlaAssignment : (rule.auto_sla_assignment !== undefined ? rule.auto_sla_assignment : true),
+        sendNotifications: rule.sendNotifications !== undefined ? rule.sendNotifications : (rule.send_notifications !== undefined ? rule.send_notifications : true)
       });
     } else {
       setCurrentRule(null);
       setFormData({
         name: '',
         keyword: '',
-        matching_strategy: 'contains',
+        matchingStrategy: 'contains',
         priority: 0,
         active: true,
-        assigned_to_user_name: '',
-        severity_override: 'none',
-        auto_sla_assignment: true,
-        send_notifications: true
+        assignedToUserId: 'unassigned',
+        assignedToUserName: '',
+        severityOverride: 'none',
+        autoSlaAssignment: true,
+        sendNotifications: true
       });
     }
     setIsDialogOpen(true);
@@ -248,8 +252,8 @@ export const RoutingRulesView: React.FC = () => {
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Match Strategy</Label>
                 <Select 
-                  value={formData.matching_strategy} 
-                  onValueChange={(v) => setFormData({...formData, matching_strategy: v})}
+                  value={formData.matchingStrategy || (formData as any).matching_strategy} 
+                  onValueChange={(v) => setFormData({...formData, matchingStrategy: v as any})}
                 >
                   <SelectTrigger className="bg-cyan-500/5 border-cyan-500/10 text-xs">
                     <SelectValue />
@@ -276,8 +280,8 @@ export const RoutingRulesView: React.FC = () => {
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Severity Override</Label>
                 <Select 
-                  value={formData.severity_override} 
-                  onValueChange={(v) => setFormData({...formData, severity_override: v})}
+                  value={formData.severityOverride || (formData as any).severity_override} 
+                  onValueChange={(v) => setFormData({...formData, severityOverride: v})}
                 >
                   <SelectTrigger className="bg-cyan-500/5 border-cyan-500/10 text-xs">
                     <SelectValue />
@@ -294,8 +298,8 @@ export const RoutingRulesView: React.FC = () => {
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Assign To Analyst</Label>
                 <Input 
-                  value={formData.assigned_to_user_name}
-                  onChange={(e) => setFormData({...formData, assigned_to_user_name: e.target.value})}
+                  value={formData.assignedToUserName || (formData as any).assigned_to_user_name}
+                  onChange={(e) => setFormData({...formData, assignedToUserName: e.target.value})}
                   className="bg-cyan-500/5 border-cyan-500/10 text-xs focus:border-cyan-500/40" 
                   placeholder="e.g., SOC Admin"
                 />

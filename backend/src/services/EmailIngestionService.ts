@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { getAssignmentForIncident } from './assignmentService';
 import { auditService } from './auditService';
 import { sendNotification } from './notificationService';
+import { SyricService } from './SyricService';
+import { SocketService } from './SocketService';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
@@ -37,10 +39,10 @@ export class EmailIngestionService {
     // Initial run
     this.processAllMailboxes();
     
-    // Set interval (e.g., every 60 seconds)
+    // Set interval (Reduced to 10 seconds for high reflectivity)
     setInterval(() => {
       this.processAllMailboxes();
-    }, 60 * 1000);
+    }, 10 * 1000);
   }
 
   static async processAllMailboxes() {
@@ -61,7 +63,7 @@ export class EmailIngestionService {
       port: settings.port,
       secure: settings.ssl,
       tls: {
-        rejectUnauthorized: false
+        rejectUnauthorized: process.env.NODE_ENV === 'production' ? true : false
       },
       auth: {
         user: settings.username,
@@ -85,20 +87,18 @@ export class EmailIngestionService {
       await client.connect();
       const lock = await client.getMailboxLock('INBOX');
       try {
-        // Ultimate Catch-Up: Search for the last 50 emails to ensure we didn't miss anything
-        const uids = await client.search({ all: true });
-        // Take the last 50 UIDs (or all if less than 50)
-        const recentUids = uids.slice(-50);
+        // Optimized: Only search for UNSEEN emails to avoid re-processing 
+        const uids = await client.search({ seen: false });
         
-        console.log(`[MAIL] Scanning last ${recentUids.length} emails in inbox for missing tickets...`);
-        
-        if (recentUids.length === 0) {
-          console.log('[MAIL] No email messages in inbox');
+        if (uids.length === 0) {
+          console.log(`[MAIL] No new messages for: ${settings.username}`);
           return;
         }
 
+        console.log(`[MAIL] Found ${uids.length} new emails. Processing...`);
+
         // Process messages one by one to avoid socket timeouts
-        for (const uid of recentUids) {
+        for (const uid of uids) {
           try {
             const message = await client.fetchOne(uid, {
               envelope: true,
@@ -106,13 +106,16 @@ export class EmailIngestionService {
             });
             
             if (message) {
-              await this.handleEmail(message);
-              // Always ensure it's marked as seen after we've processed it
+              const result = await this.handleEmail(message);
+              // Mark as seen immediately after processing attempt
               await client.messageFlagsAdd(uid, ['\\Seen']);
+
+              if (result) {
+                SocketService.emit('incidents_updated', { type: result });
+              }
             }
           } catch (itemErr: any) {
             console.error(`[MAIL] Error processing UID ${uid}:`, itemErr.message);
-            // Continue to next email
           }
         }
       } finally {
@@ -125,7 +128,7 @@ export class EmailIngestionService {
     }
   }
 
-  private static async handleEmail(message: any) {
+  private static async handleEmail(message: any): Promise<'CREATED' | 'APPENDED' | null> {
     const parsed = await simpleParser(message.source);
     const subject = parsed.subject || 'No Subject';
     const sender = parsed.from?.text || 'unknown@sender.com';
@@ -141,7 +144,7 @@ export class EmailIngestionService {
     const exists = await pool.query('SELECT 1 FROM email_message_registry WHERE message_id = $1', [messageId]);
     if (exists.rows.length > 0) {
       console.log(`[MAIL] Skipping already processed email: ${subject} from ${sender}`);
-      return;
+      return null;
     }
 
     console.log(`[MAIL] Processing email: ${subject} from ${sender}`);
@@ -170,11 +173,14 @@ export class EmailIngestionService {
       if (refResult.rows.length > 0) existingIncidentId = refResult.rows[0].id;
     }
 
+    let status: 'CREATED' | 'APPENDED' | null = null;
     if (existingIncidentId) {
       await this.appendToIncident(existingIncidentId, parsed, messageId);
+      status = 'APPENDED';
     } else {
       // 3. New Incident Creation
       await this.createNewIncident(parsed, messageId, subjectHash);
+      status = 'CREATED';
     }
 
     // Register message
@@ -182,6 +188,8 @@ export class EmailIngestionService {
       'INSERT INTO email_message_registry (message_id, subject_hash, sender) VALUES ($1, $2, $3)',
       [messageId, subjectHash, sender]
     );
+
+    return status;
   }
 
   private static async appendToIncident(incidentId: string, parsed: any, messageId: string) {
@@ -298,8 +306,11 @@ export class EmailIngestionService {
       'system'
     );
 
+    // Automated Syric AI Analysis
+    const aiInsights = await SyricService.analyzeIncident(id);
+
     await this.handleAttachments(id, parsed);
-    await this.triggerNotifications(incidentData, assignment);
+    await this.triggerNotifications({ ...incidentData, ai_insights: aiInsights }, assignment);
   }
 
   private static parseDetailedMetadata(body: string, subject: string) {

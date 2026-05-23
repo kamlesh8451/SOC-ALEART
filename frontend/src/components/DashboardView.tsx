@@ -7,7 +7,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { 
   Shield, AlertTriangle, CheckCircle, Clock, 
   LayoutDashboard, Ticket, Settings, ShieldAlert,
-  Activity, MoreHorizontal, LogOut, Search, Bell, ShieldCheck
+  Activity, MoreHorizontal, LogOut, Search, Bell, ShieldCheck,
+  FileBarChart
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,12 +49,15 @@ export const DashboardView: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsData, analyticsData] = await Promise.all([
+        const [statsData, analyticsData, incidentsData] = await Promise.all([
           incidentService.getStats(),
-          incidentService.getAnalytics()
+          incidentService.getAnalytics(),
+          incidentService.getIncidents()
         ]);
         setStats(statsData);
         setAnalytics(analyticsData);
+        setRecentIncidents(incidentsData.slice(0, 5));
+        setLoading(false);
       } catch (e) {
         console.error("Sync error", e);
       }
@@ -62,18 +66,33 @@ export const DashboardView: React.FC = () => {
     fetchData();
     const statsInterval = setInterval(fetchData, 30000); // Refresh every 30s
 
-    // Set up real-time listener for updates
+    // Set up real-time listener for updates (polling fallback)
     const unsub = incidentService.subscribeToIncidents((data) => {
       setRecentIncidents(data.slice(0, 5));
       setLoading(false);
-      fetchData(); // Also refresh stats when incidents update
+      // stats refresh handled by statsInterval or socket
     });
+
+    // High-Reflectivity Socket Listener
+    if (socket) {
+      socket.on('incidents_updated', (data) => {
+        console.log('[WS] High-priority update received:', data);
+        toast.info(`Tactical update: ${data.type}`, {
+          description: "Syncing incident registry...",
+          duration: 3000
+        });
+        fetchData(); // Trigger immediate full refresh (stats + list)
+      });
+    }
 
     return () => {
       unsub();
       clearInterval(statsInterval);
+      if (socket) {
+        socket.off('incidents_updated');
+      }
     };
-  }, []);
+  }, [socket]);
 
   const renderContent = () => {
     switch (currentView) {
