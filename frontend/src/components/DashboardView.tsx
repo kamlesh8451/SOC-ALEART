@@ -204,7 +204,7 @@ export const DashboardView: React.FC = () => {
                         ) : recentIncidents.length === 0 ? (
                           <tr><td colSpan={5} className="py-8 text-center text-cyan-500/20 font-mono uppercase tracking-widest">Secure registry is empty</td></tr>
                         ) : recentIncidents.map(inc => (
-                          <tr key={inc.id} className="border-b border-cyan-500/5 hover:bg-cyan-500/5 transition-colors group cursor-pointer">
+                          <tr key={inc.id} onClick={() => handleViewIncident(inc.id)} className="border-b border-cyan-500/5 hover:bg-cyan-500/5 transition-colors group cursor-pointer">
                             <td className="py-4 pl-2 font-mono text-[10px] text-cyan-500 font-bold tracking-tighter">{inc.ticketNumber}</td>
                             <td className="py-4 font-bold text-white/90 truncate max-w-[200px] uppercase">{inc.alertName}</td>
                             <td className="py-4">
