@@ -56,7 +56,7 @@ const PERMISSION_GROUPS = [
   }
 ];
 
-export function AdminSettings() {
+export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId: string) => void }) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
@@ -1127,7 +1127,12 @@ export function AdminSettings() {
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Associated Incident ID:</span>
                                 <code className="text-[9px] bg-secondary px-1.5 py-0.5 rounded font-mono">{log.incident_id.slice(0, 13)}...</code>
                              </div>
-                             <button className="text-[9px] font-bold text-primary hover:underline uppercase">View Incident</button>
+                             <button 
+                               onClick={() => onViewIncident?.(log.incident_id)}
+                               className="text-[9px] font-bold text-primary hover:underline uppercase"
+                             >
+                               View Incident
+                             </button>
                           </div>
                         )}
                         {log.error_details && (

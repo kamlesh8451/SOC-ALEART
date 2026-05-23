@@ -47,12 +47,24 @@ function slaHoursForSeverity(severity: string): number {
 
 async function generateUniqueTicketNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const candidate = `SOC-${Math.floor(1000 + Math.random() * 9000)}-${year}`;
-    const existing = await pool.query('SELECT 1 FROM incidents WHERE ticket_number = $1', [candidate]);
-    if (existing.rows.length === 0) return candidate;
+  // Find the highest ticket number for the current year
+  const result = await pool.query(
+    `SELECT ticket_number FROM incidents 
+     WHERE ticket_number LIKE $1 
+     ORDER BY ticket_number DESC LIMIT 1`,
+    [`SOC-%-${year}`]
+  );
+
+  let nextSeq = 1001;
+  if (result.rows.length > 0) {
+    const lastTicket = result.rows[0].ticket_number;
+    const match = lastTicket.match(/SOC-(\d+)-/);
+    if (match) {
+      nextSeq = parseInt(match[1]) + 1;
+    }
   }
-  throw new Error('Unable to generate a unique ticket number');
+
+  return `SOC-${nextSeq}-${year}`;
 }
 
 export const incidentController = {

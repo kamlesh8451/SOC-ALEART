@@ -27,7 +27,19 @@ export const DashboardView: React.FC = () => {
   const { user, logout } = useAuth();
   const socket = useSocket();
   const [currentView, setCurrentView] = useState<'dashboard' | 'incidents' | 'rules' | 'admin' | 'intel'>('dashboard');
+  const [initialIncidentId, setInitialIncidentId] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
+
+  const handleViewIncident = (id: string) => {
+    setInitialIncidentId(id);
+    setCurrentView('incidents');
+  };
+
+  useEffect(() => {
+    if (currentView !== 'incidents') {
+      setInitialIncidentId(null);
+    }
+  }, [currentView]);
   const [recentIncidents, setRecentIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,9 +74,9 @@ export const DashboardView: React.FC = () => {
       case 'rules':
         return <RoutingRulesView />;
       case 'admin':
-        return <AdminSettings />;
+        return <AdminSettings onViewIncident={handleViewIncident} />;
       case 'incidents':
-        return <IncidentsListView />;
+        return <IncidentsListView initialIncidentId={initialIncidentId} />;
       case 'intel':
         return (
           <div className="space-y-6">

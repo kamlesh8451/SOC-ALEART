@@ -16,13 +16,19 @@ import { cn } from '@/lib/utils';
 import { CreateIncidentDialog } from './CreateIncidentDialog';
 import { IncidentDetailView } from './IncidentDetailView';
 
-export const IncidentsListView: React.FC = () => {
+export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> = ({ initialIncidentId }) => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'closed' | 'investigating'>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialIncidentId) {
+      setSelectedIncidentId(initialIncidentId);
+    }
+  }, [initialIncidentId]);
 
   useEffect(() => {
     const unsub = incidentService.subscribeToIncidents((data) => {
