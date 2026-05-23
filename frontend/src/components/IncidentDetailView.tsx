@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { 
   Shield, Clock, Server, AlertCircle, FileUp, CheckCircle2, 
   ArrowRight, ExternalLink, Zap, History, MessageSquare, HardDrive,
-  Link as LinkIcon, Mail, Download
+  Link as LinkIcon, Mail, Download, Edit2, AlertTriangle
 } from "lucide-react";
 import { Incident } from "../types";
 import { incidentService } from "../services/incidentService";
