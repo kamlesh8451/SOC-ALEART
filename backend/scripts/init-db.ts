@@ -213,6 +213,14 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assignment_rules' AND column_name='conditions') THEN
         ALTER TABLE assignment_rules ADD COLUMN conditions JSONB DEFAULT '[]'::jsonb;
     END IF;
+
+    -- Ensure incidents table has new closure columns
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='incidents' AND column_name='closure_comment') THEN
+        ALTER TABLE incidents ADD COLUMN closure_comment TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='incidents' AND column_name='root_cause') THEN
+        ALTER TABLE incidents ADD COLUMN root_cause TEXT;
+    END IF;
 END $$;
 
 -- Insert default assignment rules

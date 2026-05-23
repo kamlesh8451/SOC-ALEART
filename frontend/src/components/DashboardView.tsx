@@ -95,24 +95,26 @@ export const DashboardView: React.FC = () => {
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Incident Velocity (7D)</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[300px] min-w-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats?.velocity || []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                      <XAxis dataKey="name" stroke="#67e8f950" fontSize={10} axisLine={false} tickLine={false} />
-                      <YAxis stroke="#67e8f950" fontSize={10} axisLine={false} tickLine={false} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }}
-                        cursor={{ fill: '#67e8f905' }}
-                      />
-                      <Bar dataKey="open" fill="url(#colorAlerts)" radius={[4, 4, 0, 0]} />
-                      <defs>
-                        <linearGradient id="colorAlerts" x1="0" x2="0" x2="1">
-                          <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="w-full h-full min-h-0">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <BarChart data={stats?.velocity || []}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                        <XAxis dataKey="name" stroke="#67e8f950" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis stroke="#67e8f950" fontSize={10} axisLine={false} tickLine={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }}
+                          cursor={{ fill: '#67e8f905' }}
+                        />
+                        <Bar dataKey="open" fill="url(#colorAlerts)" radius={[4, 4, 0, 0]} />
+                        <defs>
+                          <linearGradient id="colorAlerts" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -121,8 +123,8 @@ export const DashboardView: React.FC = () => {
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Alert Severity Mix</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[300px] flex flex-col items-center justify-center min-w-0 relative">
-                  <div className="w-full h-full min-h-0 min-w-0 overflow-hidden flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height={240}>
+                  <div className="w-full h-full min-h-0 min-w-0 flex items-center justify-center overflow-hidden">
+                    <ResponsiveContainer width="100%" height={240} minWidth={0} minHeight={0}>
                       <PieChart>
                         <Pie
                           data={[
