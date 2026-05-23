@@ -270,6 +270,26 @@ const IncidentRow = ({ inc, onView }: { inc: Incident, onView: () => void }) => 
       </td>
       <td className="p-5 text-right">
          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  toast.loading("Generating secure report...");
+                  await incidentService.exportOne(inc.id, inc.ticketNumber);
+                  toast.dismiss();
+                  toast.success("Report export complete");
+                } catch (err) {
+                  toast.dismiss();
+                  toast.error("Export failed");
+                }
+              }}
+              title="Export Specific Report"
+            >
+              <Download size={14} />
+            </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"><Eye size={14} /></Button>
          </div>
       </td>

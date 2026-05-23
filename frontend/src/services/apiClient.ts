@@ -23,20 +23,17 @@ export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<
     );
   }
 
-  const contentType = response.headers.get('content-type') || '';
-
-  if (!contentType.includes('application/json')) {
-    const text = await response.text();
-    if (response.status === 500 && !text.trim()) {
-      throw new Error(
-        `API returned 500 with no body at ${url}. The backend might have crashed or be misconfigured.`
-      );
+  if (!response.ok) {
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      if (response.status === 500 && !text.trim()) {
+        throw new Error(
+          `API returned 500 with no body at ${url}. The backend might have crashed or be misconfigured.`
+        );
+      }
+      throw new Error(`API error (${response.status}): ${text.slice(0, 200) || response.statusText}`);
     }
-    throw new Error(
-      response.ok
-        ? 'Invalid API response (expected JSON)'
-        : `API error (${response.status}): ${text.slice(0, 200) || response.statusText}`
-    );
   }
 
   return response;
