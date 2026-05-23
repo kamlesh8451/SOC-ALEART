@@ -1,6 +1,14 @@
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
   const token = localStorage.getItem('gsoc_token');
   
+  // Resolve the full URL if it's a relative path
+  let url = input.toString();
+  if (url.startsWith('/api')) {
+    url = `${API_BASE_URL}${url}`;
+  }
+
   const headers = new Headers(init?.headers);
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -8,10 +16,10 @@ export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<
 
   let response: Response;
   try {
-    response = await fetch(input, { ...init, headers });
+    response = await fetch(url, { ...init, headers });
   } catch {
     throw new Error(
-      'Cannot reach the API. Start the backend: cd backend && npm run dev (or npm run dev from project root).'
+      `Cannot reach the API at ${url}. Ensure the backend is running.`
     );
   }
 
