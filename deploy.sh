@@ -12,8 +12,21 @@ echo "[2/6] Installing Workspace Dependencies..."
 npm install
 
 echo "[3/6] Setting up Environment Variables..."
-# Note: We use the EC2 IP for the URLs
-EC2_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+# Try multiple ways to get the public IP
+EC2_IP=$(curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/public-ipv4)
+if [ -z "$EC2_IP" ]; then
+  EC2_IP=$(curl -s --connect-timeout 2 ifconfig.me)
+fi
+if [ -z "$EC2_IP" ]; then
+  EC2_IP=$(hostname -I | awk '{print $1}')
+fi
+
+echo "Detected IP: $EC2_IP"
+
+if [ -z "$EC2_IP" ]; then
+  echo "ERROR: Could not detect EC2 Public IP."
+  exit 1
+fi
 
 if [ -z "$DATABASE_URL" ]; then
   echo "ERROR: DATABASE_URL environment variable is missing."
