@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { 
   Shield, Clock, Server, AlertCircle, FileUp, CheckCircle2, 
   ArrowRight, ExternalLink, Zap, History, MessageSquare, HardDrive,
-  Link as LinkIcon
+  Link as LinkIcon, Mail
 } from "lucide-react";
 import { Incident } from "../types";
 import { incidentService } from "../services/incidentService";
@@ -19,7 +19,17 @@ import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export function IncidentDetailView({ incident, onBack, onSelectIncident }: { incident: Incident, onBack: () => void, onSelectIncident: (inc: Incident) => void }) {
+export function IncidentDetailView({ 
+  incident, 
+  onBack, 
+  onSelectIncident,
+  role
+}: { 
+  incident: Incident, 
+  onBack: () => void, 
+  onSelectIncident: (inc: Incident) => void,
+  role?: string
+}) {
   const [uploading, setUploading] = useState(false);
   const [escalating, setEscalating] = useState(false);
   const [escalationReason, setEscalationReason] = useState("");
@@ -62,11 +72,28 @@ export function IncidentDetailView({ incident, onBack, onSelectIncident }: { inc
     }
     setEscalating(true);
     try {
-      await incidentService.escalateIncident(incident.id, escalationReason);
+      const userRole = role || localStorage.getItem('soc-role') || 'soc_analyst';
+      
+      const response = await fetch("/api/tickets/confirm-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          ticketId: incident.id, 
+          action: 'ESCALATE', 
+          evidence: escalationReason,
+          role: userRole
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Escalation failed");
+      }
+
       toast.success("Incident escalated to SOC Lead");
       setEscalationReason("");
-    } catch (e) {
-      toast.error("Escalation failed");
+    } catch (e: any) {
+      toast.error(e.message || "Escalation failed");
     } finally {
       setEscalating(false);
     }
@@ -170,7 +197,7 @@ export function IncidentDetailView({ incident, onBack, onSelectIncident }: { inc
                 <DetailItem icon={<Server className="w-4 h-4" />} label="Affected Host" value={incident.host} />
                 <DetailItem icon={<Shield className="w-4 h-4" />} label="Domain" value={incident.domain} />
                 <DetailItem icon={<AlertCircle className="w-4 h-4" />} label="Current Status" value={incident.status.toUpperCase()} />
-                <DetailItem icon={<HardDrive className="w-4 h-4" />} label="Data Repository" value="SOC-DATA-01" />
+                <DetailItem icon={<Mail className="w-4 h-4" />} label="Incident Source" value={incident.source || 'MANUAL'} />
               </div>
               
               <div className="p-4 bg-secondary rounded-lg">
@@ -223,6 +250,21 @@ export function IncidentDetailView({ incident, onBack, onSelectIncident }: { inc
                </div>
             </CardContent>
           </Card>
+
+          {/* Email Timeline Section */}
+          {incident.source === 'EMAIL' && (
+            <Card className="bg-card border-border border-t-2 border-t-primary/30">
+               <CardHeader className="py-4 border-b border-border flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-sm font-display font-bold uppercase tracking-widest text-foreground/80">Email Communication History</CardTitle>
+                  </div>
+               </CardHeader>
+               <CardContent className="p-0">
+                  <EmailTimeline incidentId={incident.id} />
+               </CardContent>
+            </Card>
+          )}
 
           {/* Correlation Records Section */}
           <Card className="bg-card border-border border-t-2 border-t-blue-500/30">
@@ -381,6 +423,61 @@ export function IncidentDetailView({ incident, onBack, onSelectIncident }: { inc
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function EmailTimeline({ incidentId }: { incidentId: string }) {
+  const [emails, setEmails] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEmails = async () => {
+      try {
+        const response = await fetch(`/api/mail/logs?incidentId=${incidentId}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Filter logs for this specific incident if backend didn't do it
+          setEmails(data.filter((e: any) => e.incident_id === incidentId));
+        }
+      } catch (e) {
+        console.error("Failed to fetch email logs", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEmails();
+  }, [incidentId]);
+
+  if (loading) return <div className="p-8 text-center text-xs text-muted-foreground uppercase animate-pulse">Synchronizing Mail Feed...</div>;
+
+  return (
+    <div className="divide-y divide-border">
+      {emails.map((email) => (
+        <div key={email.id} className="p-4 bg-transparent hover:bg-secondary/20 transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-[8px] uppercase font-bold tracking-tighter">
+                {email.processed_status}
+              </Badge>
+              <span className="text-[10px] font-mono text-muted-foreground">{email.sender}</span>
+            </div>
+            <span className="text-[9px] text-muted-foreground">{new Date(email.received_at).toLocaleString()}</span>
+          </div>
+          <h4 className="text-xs font-bold text-foreground mb-1">{email.subject}</h4>
+          <div className="mt-2 p-3 bg-secondary/50 rounded border border-border/50">
+             <p className="text-[11px] text-muted-foreground line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
+                {/* Simplified view of body if available, or just subject */}
+                Incident updated via automated email ingestion.
+             </p>
+          </div>
+        </div>
+      ))}
+      {emails.length === 0 && (
+        <div className="p-8 text-center bg-secondary/20">
+          <p className="text-xs text-muted-foreground italic">No automated email records found for this incident thread.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

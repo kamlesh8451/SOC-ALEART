@@ -5,30 +5,36 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pool, { testConnection } from './config/db';
+import authRoutes from './routes/authRoutes';
 import incidentRoutes from './routes/incidentRoutes';
 import userRoutes from './routes/userRoutes';
 import roleRoutes from './routes/roleRoutes';
 import ruleRoutes from './routes/ruleRoutes';
 import auditRoutes from './routes/auditRoutes';
 import ticketRoutes from './routes/ticketRoutes';
-import { errorHandler } from './middleware/auth';
+import mailRoutes from './routes/mailRoutes';
+import { errorHandler, authenticate } from './middleware/auth';
 import { slaService } from './services/slaService';
+import { EmailIngestionService } from './services/EmailIngestionService';
 import { buildNotificationEmail } from './services/notificationService';
+import { queueService } from './services/queueService';
+import { createServer } from 'http';
+import { SocketService } from './services/SocketService';
 
 // Support for ESM and CJS bundling
-const getProjectRoot = () => {
+const getBackendRoot = () => {
   if (typeof __dirname !== 'undefined') {
     // CJS (Production bundled)
-    return path.resolve(__dirname, '../..');
+    return path.resolve(__dirname, '..');
   }
   // ESM (Development/tsx)
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 };
 
-const projectRoot = getProjectRoot();
+const backendRoot = getBackendRoot();
+const projectRoot = path.resolve(backendRoot, '..');
 
-dotenv.config({ path: path.join(projectRoot, '.env') });
-dotenv.config({ path: path.join(projectRoot, 'backend', '.env') });
+dotenv.config({ path: path.join(backendRoot, '.env') });
 
 // Force allow self-signed certs for Aiven/Local dev
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -51,14 +57,16 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/uploads', express.static(path.join(projectRoot, 'backend', 'uploads')));
+app.use('/uploads', express.static(path.join(backendRoot, 'uploads')));
 
-app.use('/api/incidents', incidentRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/roles', roleRoutes);
-app.use('/api/rules', ruleRoutes);
-app.use('/api/audit-logs', auditRoutes);
-app.use('/api/tickets', ticketRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/incidents', authenticate, incidentRoutes);
+app.use('/api/users', authenticate, userRoutes);
+app.use('/api/roles', authenticate, roleRoutes);
+app.use('/api/rules', authenticate, ruleRoutes);
+app.use('/api/audit-logs', authenticate, auditRoutes);
+app.use('/api/tickets', authenticate, ticketRoutes);
+app.use('/api/mail', authenticate, mailRoutes);
 
 app.post('/api/notifications/simulate-email', (req, res) => {
   try {
@@ -98,6 +106,25 @@ if (process.env.SERVE_FRONTEND !== 'false' && fs.existsSync(distIndex)) {
 
 app.use(errorHandler);
 
+// Catch-all 404 for API
+app.use('/api', (req, res) => {
+  console.log(`[404] No route matched for ${req.method} ${req.url}`);
+  res.status(404).json({ error: `Path ${req.url} not found` });
+});
+
+async function ensureSchemaCompatibility() {
+  try {
+    await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS assigned_to_user_id TEXT");
+    await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'MANUAL'");
+    await pool.query("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb");
+    console.log('[SYS] Database schema compatibility checks completed');
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[ERR] Schema compatibility check failed:', message);
+    throw err;
+  }
+}
+
 async function startServer() {
   if (!process.env.DATABASE_URL) {
     console.error('[ERR] DATABASE_URL is missing. Copy .env.example to .env and set your Aiven connection string.');
@@ -107,14 +134,20 @@ async function startServer() {
   try {
     await testConnection();
     console.log('[SYS] PostgreSQL connection verified');
+    await ensureSchemaCompatibility();
     slaService.startMonitor();
+    EmailIngestionService.start();
+    await queueService.init();
 
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[SYS] GuardianSOC API on http://localhost:${PORT}`);
+    const httpServer = createServer(app);
+    SocketService.init(httpServer);
+
+    httpServer.listen(PORT, '127.0.0.1', () => {
+      console.log(`[SYS] GuardianSOC API on http://127.0.0.1:${PORT}`);
       console.log(`[SYS] Frontend (dev): ${frontendOrigin}`);
     });
 
-    server.on('error', (err: NodeJS.ErrnoException) => {
+    httpServer.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`[ERR] Port ${PORT} is already in use.`);
       } else {

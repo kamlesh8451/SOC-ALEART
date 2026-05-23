@@ -1,42 +1,61 @@
 import pool from '../config/db';
 
-export interface AssignmentMatch {
-  id: string;
-  name: string;
+export interface AssignmentResult {
+  userId?: string;
+  userName?: string;
+  teamName?: string;
+  severityOverride?: string;
+  autoSla?: boolean;
 }
 
 export async function getAssignmentForIncident(
   alertName: string,
   description: string
-): Promise<AssignmentMatch | null> {
+): Promise<AssignmentResult | null> {
   const result = await pool.query(
-    `SELECT * FROM assignment_rules WHERE active = TRUE ORDER BY priority DESC`
+    `SELECT * FROM assignment_rules 
+     WHERE active = TRUE 
+     ORDER BY priority DESC, name ASC`
   );
 
   const combinedText = `${alertName} ${description}`.toLowerCase();
 
   for (const rule of result.rows) {
-    const keyword = (rule.keyword as string).toLowerCase();
-    const strategy = (rule.matching_strategy as string) || 'exact';
+    const keyword = rule.keyword.toLowerCase();
+    const strategy = rule.matching_strategy || 'contains';
     let matched = false;
 
     try {
-      if (strategy === 'exact') {
-        matched = combinedText.includes(keyword);
-      } else if (strategy === 'regex') {
-        matched = new RegExp(rule.keyword as string, 'i').test(combinedText);
-      } else if (strategy === 'fuzzy') {
-        const words = keyword.split(/\s+/).filter((w: string) => w.length > 0);
-        matched = words.every((word: string) => combinedText.includes(word));
+      switch (strategy) {
+        case 'exact':
+          matched = combinedText === keyword;
+          break;
+        case 'contains':
+          matched = combinedText.includes(keyword);
+          break;
+        case 'regex':
+          matched = new RegExp(rule.keyword, 'i').test(combinedText);
+          break;
+        case 'starts_with':
+          matched = combinedText.startsWith(keyword);
+          break;
+        case 'ends_with':
+          matched = combinedText.endsWith(keyword);
+          break;
       }
-    } catch {
+    } catch (err) {
+      console.error(`[RULE] Invalid rule execution for ${rule.name}:`, err);
       continue;
     }
 
     if (matched) {
+      console.log(`[RULE] Incident matched rule: ${rule.name}`);
       return {
-        id: rule.assigned_to_user_id,
-        name: rule.assigned_to_user_name,
+        userId: rule.assigned_to_user_id || undefined,
+        userName: rule.assigned_to_user_name || undefined,
+        teamName: rule.assign_to_team || undefined,
+        severityOverride: rule.severity_override || undefined,
+        autoSla: rule.auto_sla_assignment ?? true
       };
     }
   }

@@ -1,6 +1,6 @@
 import { Incident, Severity } from "../types";
 import { adminService } from "./adminService";
-import { apiJson } from "./apiClient";
+import { apiJson, apiFetch } from "./apiClient";
 
 export const incidentService = {
   // Audit logging helper
@@ -36,26 +36,20 @@ export const incidentService = {
 
   // Update incident status
   async updateStatus(id: string, status: Incident['status'], evidenceUrl?: string) {
-    const response = await fetch(`/api/incidents/${id}`, {
+    return apiJson(`/api/incidents/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, evidenceUrl }),
     });
-
-    if (!response.ok) throw new Error("Failed to update status");
-    return response.json();
   },
 
   // Request Extension
   async requestExtension(id: string, reason: string) {
-    const response = await fetch(`/api/incidents/${id}`, {
+    return apiJson(`/api/incidents/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ extensionRequested: true, extensionReason: reason }),
     });
-
-    if (!response.ok) throw new Error("Failed to request extension");
-    return response.json();
   },
 
   // Bulk Update Status
@@ -66,22 +60,16 @@ export const incidentService = {
 
   // Escalate Incident
   async escalateIncident(id: string, reason: string) {
-    const response = await fetch("/api/tickets/confirm-action", {
+    return apiJson("/api/tickets/confirm-action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
         ticketId: id, 
         action: 'ESCALATE', 
         evidence: reason,
-        role: localStorage.getItem("soc_role") || "soc_analyst"
+        role: localStorage.getItem("soc-role") || "soc_analyst"
       }),
     });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Escalation failed");
-    }
-    return response.json();
   },
 
   // Robust File Upload via Server
@@ -90,29 +78,19 @@ export const incidentService = {
     formData.append("ticketId", ticketId);
     formData.append("file", file);
 
-    const response = await fetch("/api/tickets/upload-evidence", {
+    return apiJson("/api/tickets/upload-evidence", {
       method: "POST",
       body: formData,
     });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Upload failed");
-    }
-
-    return response.json();
   },
 
   // Simulate Email Notification
   async simulateNotification(incident: Incident, type: 'alert' | 'daily_digest' | 'reminder') {
-    const response = await fetch('/api/notifications/simulate-email', {
+    return apiJson('/api/notifications/simulate-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ incident, type })
     });
-    
-    if (!response.ok) throw new Error("Simulation failed");
-    return response.json();
   },
 
   // Real-time listener (simulated with polling)
@@ -149,5 +127,16 @@ export const incidentService = {
     return () => {
       cancelled = true;
     };
+  },
+
+  async getStats() {
+    return apiJson<{
+      open: number;
+      closed: number;
+      critical: number;
+      total: number;
+      compliance: number;
+      velocity: Array<{ name: string; open: number; closed: number }>;
+    }>("/api/incidents/stats");
   }
 };

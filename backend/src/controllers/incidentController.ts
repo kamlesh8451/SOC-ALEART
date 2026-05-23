@@ -23,6 +23,7 @@ function mapIncident(row: Record<string, any>) {
       extensionReason: row.extension_reason || null,
       correlationId: row.correlation_id || null,
       assignedTo: row.assigned_to || 'Unassigned',
+      assignedToUserId: row.assigned_to_user_id || null,
       escalationHistory: row.escalation_history || [],
       slaWarningSent: !!row.sla_warning_sent,
       slaBreachedSent: !!row.sla_breached_sent,
@@ -42,6 +43,16 @@ function slaHoursForSeverity(severity: string): number {
   return 72;
 }
 
+async function generateUniqueTicketNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = `SOC-${Math.floor(1000 + Math.random() * 9000)}-${year}`;
+    const existing = await pool.query('SELECT 1 FROM incidents WHERE ticket_number = $1', [candidate]);
+    if (existing.rows.length === 0) return candidate;
+  }
+  throw new Error('Unable to generate a unique ticket number');
+}
+
 export const incidentController = {
   async getAll(_req: Request, res: Response, next: NextFunction) {
     try {
@@ -56,17 +67,19 @@ export const incidentController = {
     try {
       const data = req.body;
       const id = uuidv4();
-      const ticketNumber = `SOC-${Math.floor(1000 + Math.random() * 9000)}-${new Date().getFullYear()}`;
+      const ticketNumber = await generateUniqueTicketNumber();
       const now = Date.now();
       const slaDeadline = now + slaHoursForSeverity(data.severity) * 60 * 60 * 1000;
 
       let ownerId = data.ownerId;
       let assignedTo = data.assignedTo;
+      let assignedToUserId = data.assignedToUserId;
       if (!ownerId || ownerId === 'unassigned') {
         const match = await getAssignmentForIncident(data.alertName, data.description || '');
         if (match) {
           ownerId = match.id;
           assignedTo = match.name;
+          assignedToUserId = match.id;
         }
       }
 
@@ -75,8 +88,8 @@ export const incidentController = {
       await pool.query(
         `INSERT INTO incidents (
           id, ticket_number, alert_name, severity, host, description, detection_time, sla_deadline,
-          status, owner_id, domain, assigned_to, correlation_id, escalation_history
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+          status, owner_id, domain, assigned_to, assigned_to_user_id, correlation_id, escalation_history
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           id,
           ticketNumber,
@@ -90,6 +103,7 @@ export const incidentController = {
           ownerId || 'unassigned',
           data.domain || '',
           assignedTo || 'Unassigned',
+          assignedToUserId || null,
           correlationId,
           JSON.stringify([]),
         ]
@@ -103,7 +117,14 @@ export const incidentController = {
         req.headers['x-user-id'] as string
       );
 
-      res.status(201).json({ id, ticketNumber, status: 'open', slaDeadline, assignedTo: assignedTo || 'Unassigned' });
+      res.status(201).json({
+        id,
+        ticketNumber,
+        status: 'open',
+        slaDeadline,
+        assignedTo: assignedTo || 'Unassigned',
+        assignedToUserId: assignedToUserId || null,
+      });
     } catch (err) {
       next(err);
     }
@@ -169,6 +190,58 @@ export const incidentController = {
 
       const relatedRes = await pool.query(queryStr, params);
       res.json(relatedRes.rows.map(mapIncident));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async getStats(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const statsRes = await pool.query(`
+        SELECT 
+          COUNT(*) FILTER (WHERE status = 'open') as open_count,
+          COUNT(*) FILTER (WHERE status = 'investigating') as investigating_count,
+          COUNT(*) FILTER (WHERE status = 'closed') as closed_count,
+          COUNT(*) FILTER (WHERE severity = 'critical') as critical_count,
+          COUNT(*) FILTER (WHERE severity = 'high') as high_count,
+          COUNT(*) FILTER (WHERE severity = 'medium' OR severity = 'TEST') as medium_count,
+          COUNT(*) FILTER (WHERE severity = 'low') as low_count,
+          COUNT(*) as total_count
+        FROM incidents
+      `);
+
+      const velocityRes = await pool.query(`
+        SELECT 
+          to_char(date_trunc('day', to_timestamp(detection_time / 1000)), 'Dy') as name,
+          COUNT(*) FILTER (WHERE status != 'closed') as open,
+          COUNT(*) FILTER (WHERE status = 'closed') as closed
+        FROM incidents
+        WHERE detection_time > (extract(epoch from now()) * 1000 - 7 * 24 * 60 * 60 * 1000)
+        GROUP BY date_trunc('day', to_timestamp(detection_time / 1000)), name
+        ORDER BY date_trunc('day', to_timestamp(detection_time / 1000)) ASC
+      `);
+
+      const stats = statsRes.rows[0];
+      
+      res.json({
+        version: '4.2.1-FIXED-STATS',
+        open: parseInt(stats.open_count || '0'),
+        investigating: parseInt(stats.investigating_count || '0'),
+        closed: parseInt(stats.closed_count || '0'),
+        critical: parseInt(stats.critical_count || '0'),
+        high: parseInt(stats.high_count || '0'),
+        medium: parseInt(stats.medium_count || '0'),
+        low: parseInt(stats.low_count || '0'),
+        total: parseInt(stats.total_count || '0'),
+        compliance: stats.total_count > 0 
+          ? Math.round((parseInt(stats.closed_count || '0') / parseInt(stats.total_count || '0')) * 100) 
+          : 100,
+        velocity: velocityRes.rows.map(v => ({
+          name: v.name,
+          open: parseInt(v.open || '0'),
+          closed: parseInt(v.closed || '0')
+        }))
+      });
     } catch (err) {
       next(err);
     }

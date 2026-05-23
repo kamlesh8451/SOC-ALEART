@@ -1,9 +1,33 @@
+# Dependencies
 node_modules/
-build/
+backend/node_modules/
+frontend/node_modules/
+
+# Production Build
 dist/
-coverage/
+backend/dist/
+frontend/dist/
+
+# OS/Logs
 .DS_Store
 *.log
-.env*
+npm-debug.log*
+
+# Security & Secrets
+.env
+.env.*
 !.env.example
+*.pem
+*.key
+backend/*.pem
+backend/*.key
+
+# IDE
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+
+# Project Specific
 backend/uploads/

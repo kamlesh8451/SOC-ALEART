@@ -16,9 +16,15 @@ import {
   AlertCircle,
   ToggleLeft,
   ToggleRight,
-  Search
+  Search,
+  Mail,
+  FileText,
+  CheckCircle2,
+  Clock,
+  RefreshCw
 } from "lucide-react";
 import { adminService } from "../services/adminService";
+import { mailService } from "../services/mailService";
 import { UserProfile, AssignmentRule, UserRole, RoleDefinition } from "../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +60,7 @@ export function AdminSettings() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'rules' | 'roles'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'rules' | 'roles' | 'mail'>('users');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // Track specific action loading
   const [searchFilter, setSearchFilter] = useState('');
@@ -71,6 +77,9 @@ export function AdminSettings() {
   });
   const [newRole, setNewRole] = useState<Omit<RoleDefinition, 'id'>>({ name: '', permissions: [], description: '' });
 
+  const [mailSettings, setMailSettings] = useState<any>({ host: '', port: 993, ssl: true, username: '', password: '', poll_interval: 60, is_active: true });
+  const [mailLogs, setMailLogs] = useState<any[]>([]);
+
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,6 +92,42 @@ export function AdminSettings() {
       unsubRoles();
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'mail') {
+      fetchMailData();
+    }
+  }, [activeTab]);
+
+  const fetchMailData = async () => {
+    try {
+      const [settings, logs] = await Promise.all([
+        mailService.getSettings(),
+        mailService.getLogs()
+      ]);
+      if (settings) setMailSettings({ ...settings, password: '' });
+      setMailLogs(logs);
+    } catch (e) {
+      toast.error("Failed to fetch mail data");
+    }
+  };
+
+  const handleSaveMailSettings = async () => {
+    setLoading(true);
+    try {
+      // Map frontend poll_interval to backend expected field if necessary, 
+      // but backend already expects poll_interval.
+      await mailService.updateSettings(mailSettings);
+      toast.success("Mail integration updated and service synchronized");
+      // Clear password field for security after successful save
+      setMailSettings({ ...mailSettings, password: '' });
+      fetchMailData();
+    } catch (e) {
+      toast.error("Update failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     setSelectedRuleIds([]);
@@ -337,7 +382,8 @@ export function AdminSettings() {
           {[
             { id: 'users', label: 'Operatives', icon: Users },
             { id: 'roles', label: 'Roles & Perms', icon: Key },
-            { id: 'rules', label: 'Tactical Routing', icon: Database }
+            { id: 'rules', label: 'Tactical Routing', icon: Database },
+            { id: 'mail', label: 'Mail Automation', icon: Mail }
           ].map(tab => (
             <button 
               key={tab.id}
@@ -677,6 +723,63 @@ export function AdminSettings() {
                   )}
                 </>
               )}
+
+              {activeTab === 'mail' && (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">IMAP Host</label>
+                      <Input value={mailSettings.host} onChange={e => setMailSettings({...mailSettings, host: e.target.value})} placeholder="imap.gmail.com" className="bg-secondary border-border h-10 text-xs font-mono" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Port</label>
+                        <Input type="number" value={mailSettings.port} onChange={e => setMailSettings({...mailSettings, port: parseInt(e.target.value) || 993})} className="bg-secondary border-border h-10 text-xs" />
+                      </div>
+                      <div className="flex items-center gap-2 pt-6">
+                        <button 
+                          onClick={() => setMailSettings({...mailSettings, ssl: !mailSettings.ssl})}
+                          className={cn("w-8 h-4 rounded-full relative transition-colors", mailSettings.ssl ? "bg-primary" : "bg-muted")}
+                        >
+                          <div className={cn("absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all", mailSettings.ssl ? "left-4.5" : "left-0.5")} />
+                        </button>
+                        <span className="text-[9px] font-bold uppercase text-muted-foreground">SSL/TLS</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Username</label>
+                      <Input value={mailSettings.username} onChange={e => setMailSettings({...mailSettings, username: e.target.value})} placeholder="soc-alerts@company.com" className="bg-secondary border-border h-10 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Password / App Key</label>
+                      <Input type="password" value={mailSettings.password} onChange={e => setMailSettings({...mailSettings, password: e.target.value})} placeholder="••••••••••••••••" className="bg-secondary border-border h-10 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Poll Interval (seconds)</label>
+                      <Input type="number" value={mailSettings.poll_interval} onChange={e => setMailSettings({...mailSettings, poll_interval: parseInt(e.target.value) || 60})} className="bg-secondary border-border h-10 text-xs" />
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-secondary/50 rounded-lg border border-border">
+                       <button 
+                         onClick={() => setMailSettings({...mailSettings, is_active: !mailSettings.is_active})}
+                         className={cn("w-10 h-5 rounded-full relative transition-colors", mailSettings.is_active ? "bg-green-500" : "bg-muted")}
+                       >
+                         <div className={cn("absolute top-1 w-3 h-3 bg-white rounded-full transition-all", mailSettings.is_active ? "left-6" : "left-1")} />
+                       </button>
+                       <span className="text-[10px] font-bold uppercase text-foreground">Automation Active</span>
+                    </div>
+                  </div>
+                  <Button onClick={handleSaveMailSettings} disabled={loading} className="w-full bg-primary hover:opacity-90 text-white font-bold uppercase tracking-widest text-[10px] h-11 mt-4 shadow-lg shadow-primary/20">
+                    {loading ? "Syncing..." : "Commit Mail Protocol"}
+                  </Button>
+                  <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
+                    <p className="text-[9px] text-primary/80 leading-relaxed uppercase font-bold flex items-center gap-2">
+                       <ShieldCheck className="w-3 h-3" />
+                       Security Protocol Enabled
+                    </p>
+                    <p className="text-[8px] text-muted-foreground mt-1 uppercase">Credentials are encrypted and never exposed in the front-end interface after saving.</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -880,12 +983,76 @@ export function AdminSettings() {
                 </div>
               ))}
               
-              {activeTab === 'rules' && rules.length === 0 && (
-                 <div className="p-20 text-center border-2 border-dashed border-border rounded-xl">
-                    <Database className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-50" />
-                    <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No Tactical Routing Rules</h3>
-                    <p className="text-xs text-muted-foreground/60 mt-1">Establish keywords to automate incident assignment protocols.</p>
-                 </div>
+              {activeTab === 'mail' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                       <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Automation Registry</h3>
+                       <Badge variant="outline" className="text-[8px] h-4 border-green-500/30 text-green-500 bg-green-500/5">
+                         {mailSettings.is_active ? 'STREAMS_ACTIVE' : 'STREAMS_PAUSED'}
+                       </Badge>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={fetchMailData} className="text-[9px] font-bold uppercase h-7 gap-2">
+                      <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
+                      Refresh Logs
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {mailLogs.map((log) => (
+                      <div key={log.id} className="p-4 bg-background border border-border rounded-lg group hover:border-primary/20 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                           <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "p-2 rounded bg-secondary text-muted-foreground",
+                                log.processed_status === 'CREATED' && "text-green-500 bg-green-500/10",
+                                log.processed_status === 'APPENDED' && "text-blue-500 bg-blue-500/10",
+                                log.processed_status === 'ERROR' && "text-red-500 bg-red-500/10"
+                              )}>
+                                <Mail className="w-3.5 h-3.5" />
+                              </div>
+                              <div>
+                                 <h4 className="text-sm font-bold text-foreground truncate max-w-[400px]">{log.subject}</h4>
+                                 <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{log.sender}</p>
+                              </div>
+                           </div>
+                           <div className="text-right">
+                              <Badge variant="secondary" className="text-[8px] uppercase font-bold tracking-tighter mb-1 block">
+                                {log.processed_status}
+                              </Badge>
+                              <p className="text-[9px] text-muted-foreground flex items-center gap-1 justify-end">
+                                <Clock className="w-2.5 h-2.5" />
+                                {new Date(log.received_at).toLocaleTimeString()}
+                              </p>
+                           </div>
+                        </div>
+                        {log.incident_id && (
+                          <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+                             <div className="flex items-center gap-2">
+                                <FileText className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold">Associated Incident ID:</span>
+                                <code className="text-[9px] bg-secondary px-1.5 py-0.5 rounded font-mono">{log.incident_id.slice(0, 13)}...</code>
+                             </div>
+                             <button className="text-[9px] font-bold text-primary hover:underline uppercase">View Incident</button>
+                          </div>
+                        )}
+                        {log.error_details && (
+                          <div className="mt-2 p-2 bg-red-500/5 border border-red-500/10 rounded text-[9px] text-red-400 font-mono">
+                            {log.error_details}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {mailLogs.length === 0 && (
+                       <div className="p-20 text-center border-2 border-dashed border-border rounded-xl">
+                          <Mail className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-50" />
+                          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No Processing History</h3>
+                          <p className="text-xs text-muted-foreground/60 mt-1">Incoming security alerts will appear here once the connection is established.</p>
+                       </div>
+                    )}
+                  </div>
+                </div>
               )}
              </motion.div>
            </AnimatePresence>

@@ -34,6 +34,8 @@ export interface Incident {
   correlationId?: string;
   assignedTo?: string; // User name
   escalationHistory?: EscalationEntry[];
+  source?: 'MANUAL' | 'EMAIL';
+  metadata?: any;
 }
 
 export interface UserProfile {
