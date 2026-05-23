@@ -102,13 +102,12 @@ export const DashboardView: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2 bg-black/40 border-cyan-500/10 backdrop-blur-xl min-w-0">
+              <Card className="lg:col-span-2 bg-black/40 border-cyan-500/10 backdrop-blur-xl">
                 <CardHeader>
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Incident Velocity (7D)</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[300px] min-w-0">
-                  <div className="w-full h-full min-h-0">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <CardContent className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={stats?.velocity || []}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
                         <XAxis dataKey="name" stroke="#67e8f950" fontSize={10} axisLine={false} tickLine={false} />
@@ -126,17 +125,15 @@ export const DashboardView: React.FC = () => {
                         </defs>
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl min-w-0">
+              <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl">
                 <CardHeader>
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Alert Severity Mix</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[300px] flex flex-col items-center justify-center min-w-0 relative">
-                  <div className="w-full h-full min-h-0 min-w-0 flex items-center justify-center overflow-hidden">
-                    <ResponsiveContainer width="100%" height={240} minWidth={0} minHeight={0}>
+                <CardContent className="h-[300px] flex flex-col items-center justify-center relative">
+                    <ResponsiveContainer width="100%" height={240}>
                       <PieChart>
                         <Pie
                           data={[
@@ -164,7 +161,6 @@ export const DashboardView: React.FC = () => {
                         <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }} />
                       </PieChart>
                     </ResponsiveContainer>
-                  </div>
                   <div className="grid grid-cols-2 gap-4 mt-6 w-full">
                      {[
                         { name: 'Critical', color: '#ef4444' },

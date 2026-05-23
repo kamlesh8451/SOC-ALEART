@@ -175,7 +175,8 @@ export const incidentController = {
       }
 
       values.push(id);
-      const query = `UPDATE incidents SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${i}`;
+      // Removed updated_at = NOW() to prevent 500 errors on older schemas
+      const query = `UPDATE incidents SET ${fields.join(', ')} WHERE id = $${i}`;
       
       try {
         await pool.query(query, values);
