@@ -231,6 +231,67 @@ export const incidentController = {
     }
   },
 
+  async bulkDelete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'No IDs provided' });
+      }
+
+      await pool.query('DELETE FROM incidents WHERE id = ANY($1)', [ids]);
+      
+      await auditService.logAction(
+        'BULK_DELETE_INCIDENTS',
+        undefined,
+        undefined,
+        `Deleted ${ids.length} incidents`,
+        req.headers['x-user-id'] as string
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async bulkUpdateStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { ids, status } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0 || !status) {
+        return res.status(400).json({ error: 'Missing ids or status' });
+      }
+
+      const now = Date.now();
+      let query = 'UPDATE incidents SET status = $1';
+      const params: any[] = [status];
+
+      if (status === 'investigating') {
+        query += ', acknowledged_at = COALESCE(acknowledged_at, $2)';
+        params.push(now);
+      } else if (status === 'closed') {
+        query += ', resolved_at = COALESCE(resolved_at, $2), acknowledged_at = COALESCE(acknowledged_at, $2)';
+        params.push(now);
+      }
+
+      query += ` WHERE id = ANY($${params.length + 1})`;
+      params.push(ids);
+
+      await pool.query(query, params);
+
+      await auditService.logAction(
+        'BULK_UPDATE_STATUS',
+        undefined,
+        undefined,
+        `Updated ${ids.length} incidents to ${status}`,
+        req.headers['x-user-id'] as string
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async getAnalytics(_req: Request, res: Response, next: NextFunction) {
     try {
       const result = await pool.query(`

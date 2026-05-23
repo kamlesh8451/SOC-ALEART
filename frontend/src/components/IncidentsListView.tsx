@@ -16,13 +16,18 @@ import { cn } from '@/lib/utils';
 import { CreateIncidentDialog } from './CreateIncidentDialog';
 import { IncidentDetailView } from './IncidentDetailView';
 
+import { useAuth } from '@/lib/AuthContext';
+
 export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> = ({ initialIncidentId }) => {
+  const { user } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'closed' | 'investigating'>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (initialIncidentId) {
@@ -40,6 +45,43 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
     });
     return unsub;
   }, []);
+
+  const handleBulkClose = async () => {
+    if (!isAdmin || selectedIds.length === 0) return;
+    try {
+      toast.loading(`Neutralizing ${selectedIds.length} threats...`);
+      await incidentService.bulkUpdateStatus(selectedIds, 'closed');
+      toast.dismiss();
+      toast.success(`${selectedIds.length} tickets archived`);
+      setSelectedIds([]);
+    } catch (err) {
+      toast.dismiss();
+      toast.error("Bulk action failed");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!isAdmin || selectedIds.length === 0) return;
+    if (!confirm(`WARNIING: Permanently purge ${selectedIds.length} records from registry?`)) return;
+    try {
+      toast.loading(`Sanitizing registry...`);
+      await incidentService.bulkDelete(selectedIds);
+      toast.dismiss();
+      toast.success(`${selectedIds.length} records purged`);
+      setSelectedIds([]);
+    } catch (err) {
+      toast.dismiss();
+      toast.error("Sanitization pipeline failure");
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredIncidents.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredIncidents.map(i => i.id));
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -179,12 +221,63 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
         </div>
       </div>
 
+      <AnimatePresence>
+        {selectedIds.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-primary/10 border border-primary/20 p-3 rounded-lg flex items-center justify-between shadow-xl shadow-primary/5"
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                {selectedIds.length} incidents locked in sequence
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+               <Button 
+                 onClick={handleBulkClose}
+                 className="bg-green-500 hover:bg-green-600 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4"
+               >
+                 <CheckCircle className="w-3 h-3 mr-2" />
+                 Bulk Close
+               </Button>
+               <Button 
+                 onClick={handleBulkDelete}
+                 variant="destructive"
+                 className="font-bold uppercase tracking-widest text-[9px] h-8 px-4"
+               >
+                 <Trash2 className="w-3 h-3 mr-2" />
+                 Bulk Purge
+               </Button>
+               <Button 
+                 variant="ghost" 
+                 onClick={() => setSelectedIds([])}
+                 className="text-muted-foreground hover:text-white text-[9px] font-bold uppercase h-8"
+               >
+                 Deselect
+               </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl">
         <CardContent className="p-0">
           <div className="overflow-x-auto text-white">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-cyan-500/10 text-[10px] uppercase text-cyan-500/50 font-bold tracking-widest">
+                  {isAdmin && (
+                    <th className="p-5 w-10">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.length === filteredIncidents.length && filteredIncidents.length > 0}
+                        onChange={toggleSelectAll}
+                        className="rounded border-cyan-500/20 bg-transparent text-primary"
+                      />
+                    </th>
+                  )}
                   <th className="p-5 font-bold">Ticket ID</th>
                   <th className="p-5 font-bold">Incident Core</th>
                   <th className="p-5 font-bold">Severity</th>
@@ -199,18 +292,28 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
                 {loading ? (
                   Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse border-b border-cyan-500/5">
-                      <td colSpan={8} className="p-5 h-16 bg-cyan-500/5" />
+                      <td colSpan={isAdmin ? 9 : 8} className="p-5 h-16 bg-cyan-500/5" />
                     </tr>
                   ))
                 ) : filteredIncidents.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-20 text-center">
+                    <td colSpan={isAdmin ? 9 : 8} className="p-20 text-center">
                        <Shield className="w-12 h-12 text-cyan-500/10 mx-auto mb-4" />
                        <p className="text-cyan-500/40 font-mono text-xs uppercase tracking-widest">No matching records found in secure registry</p>
                     </td>
                   </tr>
                 ) : filteredIncidents.map((inc) => (
-                  <IncidentRow key={inc.id} inc={inc} onView={() => setSelectedIncidentId(inc.id)} />
+                  <IncidentRow 
+                    key={inc.id} 
+                    inc={inc} 
+                    onView={() => setSelectedIncidentId(inc.id)} 
+                    isAdmin={isAdmin}
+                    isSelected={selectedIds.includes(inc.id)}
+                    onSelect={(checked) => {
+                      if (checked) setSelectedIds(prev => [...prev, inc.id]);
+                      else setSelectedIds(prev => prev.filter(id => id !== inc.id));
+                    }}
+                  />
                 ))}
               </tbody>
             </table>
@@ -223,14 +326,33 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
   );
 };
 
-const IncidentRow = ({ inc, onView }: { inc: Incident, onView: () => void }) => {
+const IncidentRow = ({ inc, onView, isAdmin, isSelected, onSelect }: { 
+  inc: Incident, 
+  onView: () => void, 
+  isAdmin?: boolean,
+  isSelected?: boolean,
+  onSelect?: (checked: boolean) => void 
+}) => {
   const isBreached = Date.now() > inc.slaDeadline && inc.status !== 'closed';
 
   return (
     <tr 
       onClick={onView}
-      className="border-b border-cyan-500/5 hover:bg-cyan-500/5 transition-colors group cursor-pointer"
+      className={cn(
+        "border-b border-cyan-500/5 hover:bg-cyan-500/5 transition-colors group cursor-pointer",
+        isSelected && "bg-primary/5"
+      )}
     >
+      {isAdmin && (
+        <td className="p-5" onClick={(e) => e.stopPropagation()}>
+          <input 
+            type="checkbox" 
+            checked={isSelected}
+            onChange={(e) => onSelect?.(e.target.checked)}
+            className="rounded border-cyan-500/20 bg-transparent text-primary"
+          />
+        </td>
+      )}
       <td className="p-5 font-mono text-[10px] text-cyan-500 font-bold tracking-tighter">{inc.ticketNumber}</td>
       <td className="p-5">
         <div className="flex flex-col">
@@ -309,4 +431,5 @@ const IncidentRow = ({ inc, onView }: { inc: Incident, onView: () => void }) => 
     </tr>
   );
 };
+
 

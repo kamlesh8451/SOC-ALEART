@@ -11,6 +11,8 @@ router.get('/analytics', incidentController.getAnalytics);
 router.post('/', incidentController.create);
 router.get('/:id/export', incidentController.exportOne);
 router.patch('/:id', incidentController.update);
+router.delete('/bulk', incidentController.bulkDelete);
+router.patch('/bulk/status', incidentController.bulkUpdateStatus);
 router.get('/:id/related', incidentController.getRelated);
 
 export default router;

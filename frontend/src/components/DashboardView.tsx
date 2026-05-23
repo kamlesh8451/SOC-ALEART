@@ -20,13 +20,14 @@ import { RoutingRulesView } from './RoutingRulesView';
 import { AdminSettings } from './AdminSettings';
 import { IncidentsListView } from './IncidentsListView';
 import { ThreatMap } from './ThreatMap';
+import { ReportsHubView } from './ReportsHubView';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export const DashboardView: React.FC = () => {
   const { user, logout } = useAuth();
   const socket = useSocket();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'incidents' | 'rules' | 'admin' | 'intel'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'incidents' | 'rules' | 'admin' | 'intel' | 'reports'>('dashboard');
   const [initialIncidentId, setInitialIncidentId] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -95,6 +96,8 @@ export const DashboardView: React.FC = () => {
             <ThreatMap incidents={recentIncidents} onSelectIncident={handleViewIncident} />
           </div>
         );
+      case 'reports':
+        return <ReportsHubView />;
       case 'dashboard':
       default:
         return (
@@ -103,7 +106,7 @@ export const DashboardView: React.FC = () => {
               <KPICard title="ACTIVE THREATS" value={stats?.open || '0'} trend="+3.2%" icon={<AlertTriangle className="text-red-500" />} color="red" />
               <KPICard title="AVG ACK (MTTA)" value={`${analytics?.mtta || 0}m`} trend="Target < 15m" icon={<Activity className="text-cyan-500" />} color="cyan" />
               <KPICard title="AVG RESOLVE (MTTR)" value={`${analytics?.mttr || 0}h`} trend="Target < 24h" icon={<CheckCircle className="text-green-500" />} color="green" />
-              <KPICard title="SLA BREACHES" value={stats?.critical || '0'} trend="0.0%" icon={<ShieldAlert className="text-purple-500" />} color="purple" />
+              <KPICard title="CLOSED TICKETS" value={stats?.closed || '0'} trend="+12.4%" icon={<ShieldCheck className="text-purple-500" />} color="purple" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -264,6 +267,7 @@ export const DashboardView: React.FC = () => {
           <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
           <NavItem icon={<Ticket size={18} />} label="Incidents" active={currentView === 'incidents'} onClick={() => setCurrentView('incidents')} />
           <NavItem icon={<Activity size={18} />} label="Live Intel" active={currentView === 'intel'} onClick={() => setCurrentView('intel')} />
+          <NavItem icon={<FileBarChart size={18} />} label="Intel Reports" active={currentView === 'reports'} onClick={() => setCurrentView('reports')} />
           <NavItem icon={<Settings size={18} />} label="System Rules" active={currentView === 'rules'} onClick={() => setCurrentView('rules')} />
           <NavItem icon={<ShieldAlert size={18} />} label="Security Settings" active={currentView === 'admin'} onClick={() => setCurrentView('admin')} />
         </nav>

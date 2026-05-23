@@ -199,5 +199,21 @@ export const incidentService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ csvData }),
     });
+  },
+
+  async bulkDelete(ids: string[]) {
+    return apiJson("/api/incidents/bulk", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+  },
+
+  async bulkUpdateStatus(ids: string[], status: string) {
+    return apiJson("/api/incidents/bulk/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, status }),
+    });
   }
 };
