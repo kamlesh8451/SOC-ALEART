@@ -387,7 +387,7 @@ export function IncidentDetailView({
               <Button 
                 onClick={handleCloseTicket} 
                 className="w-full bg-primary hover:opacity-90 h-11 font-bold tracking-tight text-white"
-                disabled={!incident.evidenceUrl || incident.status === 'closed'}
+                disabled={incident.status === 'closed'}
               >
                 CONFIRM CLOSED
               </Button>
