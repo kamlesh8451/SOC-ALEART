@@ -54,7 +54,7 @@ sudo pm2 startup | tail -n 1 | bash
 
 echo "============================================"
 echo "DEPLOYMENT COMPLETE!"
-echo "SOC Dashboard: http://\$EC2_IP"
-echo "Backend API: http://\$EC2_IP:3001"
+echo "SOC Dashboard: http://$EC2_IP"
+echo "Backend API: http://$EC2_IP:3001"
 echo "Automation Engine is now ACTIVE."
 echo "============================================"

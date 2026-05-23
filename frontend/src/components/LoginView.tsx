@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
+import { apiFetch } from '@/services/apiClient';
 
 export const LoginView: React.FC = () => {
   const { login } = useAuth();
@@ -18,31 +19,23 @@ export const LoginView: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
 
-      let data;
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        data = await res.json();
-      }
+      const data = await res.json();
 
       if (!res.ok) {
         throw new Error(data?.error || `Server error: ${res.status}`);
-      }
-
-      if (!data) {
-        throw new Error('Invalid response from server');
       }
 
       login(data.token, data.user);
       toast.success('Successfully logged into SOC Command Center');
     } catch (err: any) {
       console.error('Login error:', err);
-      toast.error(err.message === 'Unexpected end of JSON input' ? 'Backend connection failed' : err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
