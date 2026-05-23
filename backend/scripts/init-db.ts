@@ -169,7 +169,7 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO users (id, email, name, role, permissions, password_hash)
 VALUES ('admin-01', 'admin@guardiansoc.local', 'System Admin', 'admin', ARRAY['all'], '$2b$10$okqTNgmorxoBONhfPM/Q1uMqBz.BAELpwzqw.sYF1U8v5yK.M8.VG')
-ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO roles (id, name, permissions, description) VALUES
   ('soc_analyst', 'SOC Analyst', ARRAY['view_incidents','create_incident','update_incident'], 'Tier-1 analyst'),
