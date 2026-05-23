@@ -101,6 +101,11 @@ export function IncidentDetailView({
   };
 
   const handleCloseTicket = async () => {
+    if (incident.evidenceUrl && !isValidUrl(incident.evidenceUrl)) {
+      toast.error("Closure BLOCKED: Evidence URL is invalid or malformed.");
+      return;
+    }
+
     if (!rootCause.trim()) {
       toast.error("Closure BLOCKED: Root Cause analysis is mandatory.");
       return;

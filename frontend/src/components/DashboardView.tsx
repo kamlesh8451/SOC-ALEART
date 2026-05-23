@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, LineChart, Line,
+  Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell
 } from 'recharts';
 import { RoutingRulesView } from './RoutingRulesView';
@@ -58,7 +58,6 @@ export const DashboardView: React.FC = () => {
   }, []);
 
   const renderContent = () => {
-
     switch (currentView) {
       case 'rules':
         return <RoutingRulesView />;
@@ -77,32 +76,12 @@ export const DashboardView: React.FC = () => {
                <Badge className="bg-green-500/10 text-green-500 border-green-500/20">NETWORK_NOMINAL</Badge>
             </div>
             <ThreatMap />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <Card className="bg-black/40 border-cyan-500/10">
-                  <CardHeader><CardTitle className="text-[10px] uppercase text-cyan-500/70 font-bold">Top Attack Vectors</CardTitle></CardHeader>
-                  <CardContent className="space-y-2 text-[10px] font-mono">
-                     <div className="flex justify-between"><span>01. BRUTE_FORCE</span><span className="text-red-500">42%</span></div>
-                     <div className="flex justify-between"><span>02. SQL_INJECTION</span><span className="text-orange-500">28%</span></div>
-                     <div className="flex justify-between"><span>03. RECONNAISSANCE</span><span className="text-yellow-500">15%</span></div>
-                  </CardContent>
-               </Card>
-               <Card className="bg-black/40 border-cyan-500/10 col-span-2">
-                  <CardHeader><CardTitle className="text-[10px] uppercase text-cyan-500/70 font-bold">Active Node Log Telemetry</CardTitle></CardHeader>
-                  <CardContent className="text-[9px] font-mono text-cyan-500/40 space-y-1">
-                     <p>[{new Date().toISOString()}] APAC-GATE-01: Connection established</p>
-                     <p>[{new Date().toISOString()}] EU-CORE-02: Scanned 4022 ports</p>
-                     <p className="text-red-400">[{new Date().toISOString()}] US-EAST-04: WARNING - HIGH_LATENCY_DETECTED</p>
-                     <p>[{new Date().toISOString()}] LATAM-EDGE-01: Heartbeat received</p>
-                  </CardContent>
-               </Card>
-            </div>
           </div>
         );
       case 'dashboard':
       default:
         return (
           <>
-            {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <KPICard title="ACTIVE THREATS" value={stats?.open || '0'} trend="+3.2%" icon={<AlertTriangle className="text-red-500" />} color="red" />
               <KPICard title="PENDING ACTION" value={stats?.investigating || '0'} trend="-1.5%" icon={<Clock className="text-orange-500" />} color="orange" />
@@ -110,7 +89,6 @@ export const DashboardView: React.FC = () => {
               <KPICard title="RESOLVED (24H)" value={stats?.closed || '0'} trend="+12.4%" icon={<CheckCircle className="text-green-500" />} color="green" />
             </div>
 
-            {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-2 bg-black/40 border-cyan-500/10 backdrop-blur-xl min-w-0">
                 <CardHeader>
@@ -128,7 +106,7 @@ export const DashboardView: React.FC = () => {
                       />
                       <Bar dataKey="open" fill="url(#colorAlerts)" radius={[4, 4, 0, 0]} />
                       <defs>
-                        <linearGradient id="colorAlerts" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorAlerts" x1="0" x2="0" x2="1">
                           <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
                           <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
                         </linearGradient>
@@ -143,35 +121,36 @@ export const DashboardView: React.FC = () => {
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Alert Severity Mix</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[300px] flex flex-col items-center justify-center min-w-0 relative">
-                  <div className="w-full h-full min-h-0 min-w-0 overflow-hidden">
+                  <div className="w-full h-full min-h-0 min-w-0 overflow-hidden flex items-center justify-center">
                     <ResponsiveContainer width="100%" height={240}>
                       <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Critical', value: stats?.critical || 0, color: '#ef4444' },
-                          { name: 'High', value: stats?.high || 0, color: '#f97316' },
-                          { name: 'Medium', value: stats?.medium || 0, color: '#eab308' },
-                          { name: 'Low', value: stats?.low || 0, color: '#3b82f6' },
-                        ].filter(d => d.value > 0)}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {[
-                          { name: 'Critical', value: stats?.critical || 0, color: '#ef4444' },
-                          { name: 'High', value: stats?.high || 0, color: '#f97316' },
-                          { name: 'Medium', value: stats?.medium || 0, color: '#eab308' },
-                          { name: 'Low', value: stats?.low || 0, color: '#3b82f6' },
-                        ].filter(d => d.value > 0).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                        <Pie
+                          data={[
+                            { name: 'Critical', value: stats?.critical || 0, color: '#ef4444' },
+                            { name: 'High', value: stats?.high || 0, color: '#f97316' },
+                            { name: 'Medium', value: stats?.medium || 0, color: '#eab308' },
+                            { name: 'Low', value: stats?.low || 0, color: '#3b82f6' },
+                          ].filter(d => d.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {[
+                            { name: 'Critical', color: '#ef4444' },
+                            { name: 'High', color: '#f97316' },
+                            { name: 'Medium', color: '#eab308' },
+                            { name: 'Low', color: '#3b82f6' },
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                   <div className="grid grid-cols-2 gap-4 mt-6 w-full">
                      {[
                         { name: 'Critical', color: '#ef4444' },
@@ -190,7 +169,6 @@ export const DashboardView: React.FC = () => {
               </Card>
             </div>
 
-            {/* Active Incidents Table */}
             <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl">
                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Recent Tactical Activity</CardTitle>
@@ -253,7 +231,6 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden font-sans">
-      {/* Sidebar */}
       <aside className="w-64 border-r border-cyan-500/10 bg-black/40 backdrop-blur-md flex flex-col shadow-2xl">
         <div className="p-6 flex items-center gap-3 border-b border-cyan-500/10">
           <div className="w-8 h-8 bg-cyan-500 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/20">
@@ -293,10 +270,8 @@ export const DashboardView: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-8 relative scrollbar-thin scrollbar-thumb-cyan-500/20">
         <div className="max-w-7xl mx-auto space-y-8">
-          {/* Header */}
           <div className="flex justify-between items-end border-b border-cyan-500/20 pb-8">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -304,7 +279,7 @@ export const DashboardView: React.FC = () => {
                 <span className="text-[10px] font-mono font-bold text-cyan-500/70 tracking-[0.3em] uppercase">Tactical Operations Command</span>
               </div>
               <h1 className="text-4xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-cyan-500/80">HQ Command Center</h1>
-              <p className="text-cyan-500/40 text-[9px] font-mono uppercase tracking-[0.25em] mt-2 max-w-xl leading-relaxed">Centralized Security Orchestration, Monitoring & Automated Response Hub v4.2.0-STABLE</p>
+              <p className="text-cyan-500/40 text-[9px] font-mono uppercase tracking-[0.25em] mt-2 max-w-xl leading-relaxed">Centralized Security Orchestration Hub v4.2.1-STABLE</p>
             </div>
             <div className="flex items-center gap-4">
                <div className="relative">
@@ -317,7 +292,6 @@ export const DashboardView: React.FC = () => {
                </Button>
             </div>
           </div>
-
           {renderContent()}
         </div>
       </main>
