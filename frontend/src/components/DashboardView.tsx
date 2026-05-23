@@ -76,7 +76,25 @@ export const DashboardView: React.FC = () => {
 
   const renderContent = () => {
     switch (currentView) {
-      // ... rest of switch ...
+      case 'rules':
+        return <RoutingRulesView />;
+      case 'admin':
+        return <AdminSettings onViewIncident={handleViewIncident} />;
+      case 'incidents':
+        return <IncidentsListView initialIncidentId={initialIncidentId} />;
+      case 'intel':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-cyan-500/10 pb-4">
+               <div>
+                  <h2 className="text-xl font-bold uppercase tracking-tighter text-white">Live Threat Intelligence</h2>
+                  <p className="text-[10px] text-cyan-500/50 font-mono">Global Node Status & Real-time Attack Surface Visualization</p>
+               </div>
+               <Badge className="bg-green-500/10 text-green-500 border-green-500/20">NETWORK_NOMINAL</Badge>
+            </div>
+            <ThreatMap incidents={recentIncidents} onSelectIncident={handleViewIncident} />
+          </div>
+        );
       case 'dashboard':
       default:
         return (
@@ -86,9 +104,6 @@ export const DashboardView: React.FC = () => {
               <KPICard title="AVG ACK (MTTA)" value={`${analytics?.mtta || 0}m`} trend="Target < 15m" icon={<Activity className="text-cyan-500" />} color="cyan" />
               <KPICard title="AVG RESOLVE (MTTR)" value={`${analytics?.mttr || 0}h`} trend="Target < 24h" icon={<CheckCircle className="text-green-500" />} color="green" />
               <KPICard title="SLA BREACHES" value={stats?.critical || '0'} trend="0.0%" icon={<ShieldAlert className="text-purple-500" />} color="purple" />
-            </div>
-
-              <KPICard title="RESOLVED (24H)" value={stats?.closed || '0'} trend="+12.4%" icon={<CheckCircle className="text-green-500" />} color="green" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
