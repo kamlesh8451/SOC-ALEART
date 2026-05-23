@@ -364,12 +364,22 @@ export function IncidentDetailView({
               </div>
 
               {incident.evidenceUrl && (
-                <div className="flex items-center gap-3 p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
-                  <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-green-500 truncate">Evidence Verified</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{incident.evidenceUrl}</p>
+                <div className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-lg group">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-green-500 truncate">Evidence Attached</p>
+                      <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{incident.evidenceUrl}</p>
+                    </div>
                   </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-green-500/30 text-green-500 hover:bg-green-500/10 h-7 text-[9px] uppercase font-bold tracking-widest shrink-0"
+                    onClick={() => window.open(incident.evidenceUrl, '_blank')}
+                  >
+                    View File
+                  </Button>
                 </div>
               )}
 

@@ -87,7 +87,7 @@ export const DashboardView: React.FC = () => {
                </div>
                <Badge className="bg-green-500/10 text-green-500 border-green-500/20">NETWORK_NOMINAL</Badge>
             </div>
-            <ThreatMap />
+            <ThreatMap incidents={recentIncidents} onSelectIncident={handleViewIncident} />
           </div>
         );
       case 'dashboard':
@@ -302,7 +302,12 @@ export const DashboardView: React.FC = () => {
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500/40" />
                   <input className="bg-cyan-500/5 border border-cyan-500/10 rounded-full pl-10 pr-4 py-2 text-xs focus:border-cyan-500/40 transition-all outline-none w-64 text-white placeholder:text-cyan-500/20" placeholder="QUERY THREAT DATABASE..." />
                </div>
-               <Button size="icon" variant="ghost" className="relative text-cyan-500 border border-cyan-500/10 hover:bg-cyan-500/10 transition-all">
+               <Button 
+                 size="icon" 
+                 variant="ghost" 
+                 className="relative text-cyan-500 border border-cyan-500/10 hover:bg-cyan-500/10 transition-all"
+                 onClick={() => setCurrentView('incidents')}
+               >
                  <Bell size={18} />
                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-black shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
                </Button>
