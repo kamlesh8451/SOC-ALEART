@@ -3,8 +3,17 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '../../../.env') });
+const getDirname = () => {
+  try {
+    if (typeof __dirname !== 'undefined') return __dirname;
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch (e) {
+    return process.cwd();
+  }
+};
+
+const _dirname = getDirname();
+dotenv.config({ path: path.join(_dirname, '../../../.env') });
 
 const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',

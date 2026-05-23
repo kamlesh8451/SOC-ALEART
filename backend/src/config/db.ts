@@ -5,10 +5,14 @@ import { fileURLToPath } from 'url';
 
 // Support for ESM and CJS bundling
 const getProjectRoot = () => {
-  if (typeof __dirname !== 'undefined') {
-    return path.resolve(__dirname, '../../..');
+  try {
+    if (typeof __dirname !== 'undefined') {
+      return path.resolve(__dirname, '../../..');
+    }
+    return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+  } catch (e) {
+    return process.cwd(); // Final fallback
   }
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 };
 
 const projectRoot = getProjectRoot();

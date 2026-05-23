@@ -5,8 +5,17 @@ import { fileURLToPath } from 'url';
 import pool from '../config/db';
 import { auditService } from '../services/auditService';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.resolve(__dirname, '../../uploads');
+const getDirname = () => {
+  try {
+    if (typeof __dirname !== 'undefined') return __dirname;
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch (e) {
+    return process.cwd();
+  }
+};
+
+const _dirname = getDirname();
+const uploadsDir = path.resolve(_dirname, '../../uploads');
 
 const ALLOWED_MIME = new Set([
   'image/png',
