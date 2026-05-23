@@ -137,11 +137,21 @@ export const incidentController = {
       const { id } = req.params;
       const updates = req.body;
 
+      console.log(`[DEBUG] Updating incident ${id}:`, JSON.stringify(updates));
+
+      const allowedFields = new Set([
+        'status', 'severity', 'assignedTo', 'assignedToUserId', 
+        'ownerId', 'description', 'evidenceUrl', 'extensionRequested', 
+        'extensionReason', 'rootCause', 'closureComment'
+      ]);
+
       const fields: string[] = [];
       const values: unknown[] = [];
       let i = 1;
 
       for (const [key, value] of Object.entries(updates)) {
+        if (!allowedFields.has(key)) continue;
+
         const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
         fields.push(`${snakeKey} = $${i}`);
         values.push(typeof value === 'object' ? JSON.stringify(value) : value);
@@ -149,14 +159,13 @@ export const incidentController = {
       }
 
       if (fields.length === 0) {
-        return res.status(400).json({ error: 'No fields to update' });
+        return res.status(400).json({ error: 'No valid fields to update' });
       }
 
       values.push(id);
-      await pool.query(
-        `UPDATE incidents SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${i}`,
-        values
-      );
+      const query = `UPDATE incidents SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${i}`;
+      
+      await pool.query(query, values);
 
       await auditService.logAction(
         'UPDATE_INCIDENT',

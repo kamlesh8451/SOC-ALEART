@@ -46,19 +46,24 @@ EOF
 echo "[4/6] Building Backend & Frontend..."
 npm run build -w backend
 
-# Inject EC2 IP into Frontend build so it knows where the API is
-export VITE_API_URL=http://$EC2_IP:3001
-export VITE_SOCKET_URL=http://$EC2_IP:3001
+# Create temporary .env for frontend build to ensure Vite picks it up
+cat <<EOF > frontend/.env
+VITE_API_URL=http://$EC2_IP:3001
+VITE_SOCKET_URL=http://$EC2_IP:3001
+EOF
+
 npm run build -w frontend
+rm frontend/.env
 
 echo "[5/6] Starting SOC Engine (PM2)..."
+# Force kill and delete to ensure clean slate
 pm2 delete all 2>/dev/null || true
+sudo fuser -k 3001/tcp 2>/dev/null || true
+sudo fuser -k 80/tcp 2>/dev/null || true
+
 cd backend
 pm2 start dist/server.cjs --name "soc-backend"
 cd ..
-
-# Clear port 80 if nginx or something else is holding it
-sudo fuser -k 80/tcp 2>/dev/null || true
 sudo pm2 serve frontend/dist 80 --name "soc-frontend" --spa
 
 echo "[6/6] Finalizing System..."
