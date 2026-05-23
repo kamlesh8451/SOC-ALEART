@@ -3,6 +3,7 @@ import pool from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 import { auditService } from '../services/auditService';
 import { getAssignmentForIncident } from '../services/assignmentService';
+import PDFDocument from 'pdfkit';
 
 function mapIncident(row: Record<string, any>) {
   try {
@@ -324,53 +325,58 @@ export const incidentController = {
 
       const incident = mapIncident(result.rows[0]);
       
-      // For a specific ticket, we might want a more detailed text/markdown report
-      const report = `
-GUARDIANSOC INCIDENT REPORT
-===========================
-Ticket Number: ${incident.ticketNumber}
-ID: ${incident.id}
-Status: ${incident.status.toUpperCase()}
-Severity: ${incident.severity.toUpperCase()}
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=incident_${incident.ticketNumber}_report.pdf`);
 
-DETECTION INFO
---------------
-Alert Name: ${incident.alertName}
-Host: ${incident.host}
-Domain: ${incident.domain}
-Detection Time: ${new Date(incident.detectionTime).toLocaleString()}
-SLA Deadline: ${new Date(incident.slaDeadline).toLocaleString()}
+      const doc = new PDFDocument({ margin: 50 });
+      doc.pipe(res);
 
-DESCRIPTION
------------
-${incident.description || 'No description provided.'}
+      doc.fontSize(20).text('GUARDIANSOC INCIDENT REPORT', { align: 'center' });
+      doc.moveDown();
+      
+      doc.fontSize(14).text(`Ticket Number: ${incident.ticketNumber}`);
+      doc.fontSize(10).text(`ID: ${incident.id}`);
+      doc.text(`Status: ${incident.status.toUpperCase()}`);
+      doc.text(`Severity: ${incident.severity.toUpperCase()}`);
+      doc.moveDown();
 
-ASSIGNMENT
-----------
-Assigned To: ${incident.assignedTo}
-Owner ID: ${incident.ownerId}
+      doc.fontSize(14).text('DETECTION INFO');
+      doc.fontSize(10);
+      doc.text(`Alert Name: ${incident.alertName}`);
+      doc.text(`Host: ${incident.host}`);
+      doc.text(`Domain: ${incident.domain}`);
+      doc.text(`Detection Time: ${new Date(incident.detectionTime).toLocaleString()}`);
+      doc.text(`SLA Deadline: ${new Date(incident.slaDeadline).toLocaleString()}`);
+      doc.moveDown();
 
-INVESTIGATION
--------------
-Root Cause: ${incident.rootCause || 'N/A'}
-Closure Comment: ${incident.closureComment || 'N/A'}
-Evidence: ${incident.evidenceUrl || 'No evidence linked'}
+      doc.fontSize(14).text('DESCRIPTION');
+      doc.fontSize(10).text(incident.description || 'No description provided.');
+      doc.moveDown();
 
-TIMESTAMPS
-----------
-Created At: ${incident.createdAt}
-Updated At: ${incident.updatedAt}
+      doc.fontSize(14).text('ASSIGNMENT');
+      doc.fontSize(10);
+      doc.text(`Assigned To: ${incident.assignedTo}`);
+      doc.text(`Owner ID: ${incident.ownerId}`);
+      doc.moveDown();
 
-ESCALATION HISTORY
-------------------
-${incident.escalationHistory.length > 0 
-  ? incident.escalationHistory.map((h: any) => `- [${new Date(h.timestamp).toLocaleString()}] ${h.userName}: ${h.reason}`).join('\n')
-  : 'No escalation history.'}
-      `.trim();
+      doc.fontSize(14).text('INVESTIGATION');
+      doc.fontSize(10);
+      doc.text(`Root Cause: ${incident.rootCause || 'N/A'}`);
+      doc.text(`Closure Comment: ${incident.closureComment || 'N/A'}`);
+      doc.text(`Evidence: ${incident.evidenceUrl || 'No evidence linked'}`);
+      doc.moveDown();
 
-      res.setHeader('Content-Type', 'text/plain');
-      res.setHeader('Content-Disposition', `attachment; filename=incident_${incident.ticketNumber}_report.txt`);
-      res.send(report);
+      doc.fontSize(14).text('ESCALATION HISTORY');
+      doc.fontSize(10);
+      if (incident.escalationHistory.length > 0) {
+        incident.escalationHistory.forEach((h: any) => {
+          doc.text(`- [${new Date(h.timestamp).toLocaleString()}] ${h.userName}: ${h.reason}`);
+        });
+      } else {
+        doc.text('No escalation history.');
+      }
+
+      doc.end();
     } catch (err) {
       next(err);
     }
