@@ -28,6 +28,8 @@ function mapIncident(row: Record<string, any>) {
       slaWarningSent: !!row.sla_warning_sent,
       slaBreachedSent: !!row.sla_breached_sent,
       notificationPriority: row.notification_priority || null,
+      closureComment: row.closure_comment || null,
+      rootCause: row.root_cause || null,
       createdAt: row.created_at || new Date().toISOString(),
       updatedAt: row.updated_at || new Date().toISOString(),
     };

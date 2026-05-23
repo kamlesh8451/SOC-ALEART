@@ -33,6 +33,8 @@ export function IncidentDetailView({
   const [uploading, setUploading] = useState(false);
   const [escalating, setEscalating] = useState(false);
   const [escalationReason, setEscalationReason] = useState("");
+  const [closureComment, setClosureComment] = useState("");
+  const [rootCause, setRootCause] = useState("");
   const [relatedIncidents, setRelatedIncidents] = useState<Incident[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
@@ -119,8 +121,18 @@ export function IncidentDetailView({
       return;
     }
 
+    if (!rootCause.trim()) {
+      toast.error("Closure BLOCKED: Root Cause analysis is mandatory.");
+      return;
+    }
+
+    if (!closureComment.trim()) {
+      toast.error("Closure BLOCKED: Closure summary is mandatory.");
+      return;
+    }
+
     try {
-      await incidentService.updateStatus(incident.id, 'closed');
+      await incidentService.updateStatus(incident.id, 'closed', incident.evidenceUrl, closureComment, rootCause);
       toast.success("Incident closed and validated.");
     } catch (error) {
       toast.error("Failed to close ticket");
@@ -347,6 +359,30 @@ export function IncidentDetailView({
                   </div>
                 </div>
               )}
+
+              <div className="space-y-3 pt-2">
+                <Label htmlFor="rootCause" className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Root Cause Analysis</Label>
+                <textarea 
+                  id="rootCause"
+                  value={rootCause || incident.rootCause || ""}
+                  onChange={(e) => setRootCause(e.target.value)}
+                  placeholder="What was the origin of this alert?"
+                  className="flex min-h-[60px] w-full rounded-md border border-border bg-secondary px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
+                  disabled={incident.status === 'closed'}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="closureComment" className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Closure Summary</Label>
+                <textarea 
+                  id="closureComment"
+                  value={closureComment || incident.closureComment || ""}
+                  onChange={(e) => setClosureComment(e.target.value)}
+                  placeholder="Detail the resolution actions taken..."
+                  className="flex min-h-[80px] w-full rounded-md border border-border bg-secondary px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
+                  disabled={incident.status === 'closed'}
+                />
+              </div>
 
               <Button 
                 onClick={handleCloseTicket} 

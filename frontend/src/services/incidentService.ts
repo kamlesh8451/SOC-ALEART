@@ -35,11 +35,11 @@ export const incidentService = {
   },
 
   // Update incident status
-  async updateStatus(id: string, status: Incident['status'], evidenceUrl?: string) {
+  async updateStatus(id: string, status: Incident['status'], evidenceUrl?: string, closureComment?: string, rootCause?: string) {
     return apiJson(`/api/incidents/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, evidenceUrl }),
+      body: JSON.stringify({ status, evidenceUrl, closureComment, rootCause }),
     });
   },
 

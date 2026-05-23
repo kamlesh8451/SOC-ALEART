@@ -33,6 +33,8 @@ export interface Incident {
   extensionReason?: string;
   correlationId?: string;
   assignedTo?: string; // User name
+  closureComment?: string;
+  rootCause?: string;
   escalationHistory?: EscalationEntry[];
   source?: 'MANUAL' | 'EMAIL';
   metadata?: any;
