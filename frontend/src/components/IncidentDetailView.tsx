@@ -545,29 +545,59 @@ function LogEntry({ user, action, rawDetails, time }: { user: string, action: st
   let icon = <Shield className="w-3 h-3 text-cyan-500" />;
   let detailsText = rawDetails;
 
+  const tryParseJSON = (str: string) => {
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const parsed = tryParseJSON(rawDetails);
+
   if (action === 'CREATE_INCIDENT') {
     friendlyAction = "Registered a new incident";
     icon = <AlertCircle className="w-3 h-3 text-red-500" />;
+    detailsText = rawDetails;
   } else if (action === 'UPDATE_INCIDENT') {
     friendlyAction = "Modified incident parameters";
     icon = <Edit2 className="w-3 h-3 text-blue-500" />;
-    try {
-      const parsed = JSON.parse(rawDetails);
+    
+    if (parsed) {
       if (parsed.status === 'closed') {
         friendlyAction = "Closed the incident";
         icon = <CheckCircle2 className="w-3 h-3 text-green-500" />;
-        detailsText = `Reason: ${parsed.closureComment || 'N/A'}`;
+        detailsText = `Reason: ${parsed.closureComment || 'Standard workflow closure'}`;
+        if (parsed.rootCause) {
+           detailsText += ` | Root Cause: ${parsed.rootCause}`;
+        }
       } else {
-        const keys = Object.keys(parsed).map(k => k.replace(/([A-Z])/g, ' $1').toLowerCase()).join(', ');
-        detailsText = `Updated: ${keys}`;
+        const keys = Object.keys(parsed)
+          .filter(k => k !== 'updatedAt')
+          .map(k => k.replace(/([A-Z])/g, ' $1').toLowerCase())
+          .join(', ');
+        detailsText = `Updated fields: ${keys}`;
       }
-    } catch(e) {}
-  } else if (action === 'ESCALATE_INCIDENT') {
+    } else {
+      // Fallback if not valid JSON
+      detailsText = rawDetails || "System state updated";
+    }
+  } else if (action === 'ESCALATE' || action === 'ESCALATE_INCIDENT') {
     friendlyAction = "Escalated the incident";
     icon = <AlertTriangle className="w-3 h-3 text-orange-500" />;
+    detailsText = rawDetails ? rawDetails.replace("Action via API. Detail: ", "") : "Level 2 intervention requested";
   } else if (action === 'UPLOAD_EVIDENCE') {
     friendlyAction = "Uploaded forensic evidence";
     icon = <FileUp className="w-3 h-3 text-purple-500" />;
+  } else if (action === 'CONFIRM_CLOSED_EMAIL') {
+    friendlyAction = "Closed via Email Link";
+    icon = <CheckCircle2 className="w-3 h-3 text-green-500" />;
+  } else if (action === 'REQUEST_EXTENSION_EMAIL' || action === 'REQUEST_EXTENSION') {
+    friendlyAction = "Requested SLA Extension";
+    icon = <Clock className="w-3 h-3 text-yellow-500" />;
+  } else if (action === 'ACK_NOT_CLOSED') {
+    friendlyAction = "Acknowledged Open Status via Email";
+    icon = <Mail className="w-3 h-3 text-blue-500" />;
   }
 
   return (
@@ -583,7 +613,7 @@ function LogEntry({ user, action, rawDetails, time }: { user: string, action: st
           <span className="font-bold text-primary mr-1">{user}</span>
           {friendlyAction}
         </p>
-        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono bg-secondary/30 p-1.5 rounded inline-block border border-border mt-1">
+        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono bg-secondary/30 p-1.5 rounded inline-block border border-border">
           {detailsText}
         </p>
         <p className="text-[9px] text-muted-foreground/60 mt-1 uppercase tracking-widest flex items-center gap-1">
