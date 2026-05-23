@@ -106,8 +106,8 @@ export const DashboardView: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Incident Velocity (7D)</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                <CardContent className="h-[300px] w-full min-w-0 min-h-0">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
                       <BarChart data={stats?.velocity || []}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
                         <XAxis dataKey="name" stroke="#67e8f950" fontSize={10} axisLine={false} tickLine={false} />
@@ -132,8 +132,8 @@ export const DashboardView: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="text-xs font-bold uppercase tracking-widest text-cyan-500/70">Alert Severity Mix</CardTitle>
                 </CardHeader>
-                <CardContent className="h-[300px] flex flex-col items-center justify-center relative">
-                    <ResponsiveContainer width="100%" height={240}>
+                <CardContent className="h-[300px] flex flex-col items-center justify-center relative min-w-0 min-h-0">
+                    <ResponsiveContainer width="100%" height={240} minWidth={100} minHeight={100}>
                       <PieChart>
                         <Pie
                           data={[

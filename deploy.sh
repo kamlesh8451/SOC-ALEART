@@ -43,7 +43,9 @@ DATABASE_URL=\$DATABASE_URL
 DEFAULT_ALERT_RECIPIENT=kamleshgawade786@gmail.com
 EOF
 
-echo "[4/6] Building Backend & Frontend..."
+echo "[4/6] Initializing Database & Building..."
+# Ensure database schema is up-to-date with new columns
+npm run init-db -w backend
 npm run build -w backend
 
 # Create temporary .env for frontend build to ensure Vite picks it up
