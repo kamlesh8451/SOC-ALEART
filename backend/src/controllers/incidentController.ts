@@ -31,6 +31,7 @@ function mapIncident(row: Record<string, any>) {
       notificationPriority: row.notification_priority || null,
       closureComment: row.closure_comment || null,
       rootCause: row.root_cause || null,
+      metadata: row.metadata || {},
       createdAt: row.created_at || new Date().toISOString(),
       updatedAt: row.updated_at || new Date().toISOString(),
     };
@@ -328,52 +329,168 @@ export const incidentController = {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=incident_${incident.ticketNumber}_report.pdf`);
 
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
       doc.pipe(res);
 
-      doc.fontSize(20).text('GUARDIANSOC INCIDENT REPORT', { align: 'center' });
-      doc.moveDown();
+      // Colors & Styles
+      const primaryColor = '#0F172A'; // Slate 900
+      const secondaryColor = '#64748B'; // Slate 500
+      const accentColor = '#3B82F6'; // Blue 500
+      const borderColor = '#E2E8F0'; // Slate 200
       
-      doc.fontSize(14).text(`Ticket Number: ${incident.ticketNumber}`);
-      doc.fontSize(10).text(`ID: ${incident.id}`);
-      doc.text(`Status: ${incident.status.toUpperCase()}`);
-      doc.text(`Severity: ${incident.severity.toUpperCase()}`);
-      doc.moveDown();
+      const severityColors: Record<string, string> = {
+        critical: '#DC2626',
+        high: '#EA580C',
+        medium: '#D97706',
+        low: '#059669'
+      };
 
-      doc.fontSize(14).text('DETECTION INFO');
-      doc.fontSize(10);
-      doc.text(`Alert Name: ${incident.alertName}`);
-      doc.text(`Host: ${incident.host}`);
-      doc.text(`Domain: ${incident.domain}`);
-      doc.text(`Detection Time: ${new Date(incident.detectionTime).toLocaleString()}`);
-      doc.text(`SLA Deadline: ${new Date(incident.slaDeadline).toLocaleString()}`);
-      doc.moveDown();
+      // Header Section
+      doc.rect(0, 0, doc.page.width, 100).fill(primaryColor);
+      doc.fillColor('#FFFFFF').fontSize(24).font('Helvetica-Bold').text('GUARDIANSOC', 50, 35);
+      doc.fontSize(10).font('Helvetica').text('ENTERPRISE INCIDENT MANAGEMENT PLATFORM', 50, 65, { characterSpacing: 1 });
+      
+      doc.fontSize(10).font('Helvetica-Bold').text('CONFIDENTIAL REPORT', 400, 40, { align: 'right' });
+      doc.fontSize(8).font('Helvetica').text(`GENERATED: ${new Date().toLocaleString()}`, 400, 55, { align: 'right' });
+      doc.text(`REFERENCE: ${incident.ticketNumber}`, 400, 68, { align: 'right' });
 
-      doc.fontSize(14).text('DESCRIPTION');
-      doc.fontSize(10).text(incident.description || 'No description provided.');
-      doc.moveDown();
+      doc.moveDown(5);
 
-      doc.fontSize(14).text('ASSIGNMENT');
-      doc.fontSize(10);
-      doc.text(`Assigned To: ${incident.assignedTo}`);
-      doc.text(`Owner ID: ${incident.ownerId}`);
-      doc.moveDown();
+      // Summary Dashboard Info
+      const startY = 130;
+      doc.rect(50, startY, 500, 70).fill('#F8FAFC').stroke(borderColor);
+      
+      // Labels
+      doc.fillColor(secondaryColor).font('Helvetica-Bold').fontSize(8);
+      doc.text('TICKET NUMBER', 70, startY + 15);
+      doc.text('CURRENT STATUS', 190, startY + 15);
+      doc.text('SEVERITY LEVEL', 310, startY + 15);
+      doc.text('DETECTION TIME', 430, startY + 15);
 
-      doc.fontSize(14).text('INVESTIGATION');
-      doc.fontSize(10);
-      doc.text(`Root Cause: ${incident.rootCause || 'N/A'}`);
-      doc.text(`Closure Comment: ${incident.closureComment || 'N/A'}`);
-      doc.text(`Evidence: ${incident.evidenceUrl || 'No evidence linked'}`);
-      doc.moveDown();
+      // Values
+      doc.fillColor(primaryColor).font('Helvetica-Bold').fontSize(12);
+      doc.text(incident.ticketNumber, 70, startY + 30);
+      
+      const statusColor = incident.status === 'closed' ? '#059669' : (incident.status === 'investigating' ? '#3B82F6' : '#DC2626');
+      doc.fillColor(statusColor).text(incident.status.toUpperCase(), 190, startY + 30);
+      
+      // Severity Badge
+      const sevColor = severityColors[incident.severity.toLowerCase()] || severityColors.medium;
+      doc.rect(310, startY + 28, 70, 20).fill(sevColor);
+      doc.fillColor('#FFFFFF').fontSize(9).font('Helvetica-Bold').text(incident.severity.toUpperCase(), 310, startY + 34, { width: 70, align: 'center' });
 
-      doc.fontSize(14).text('ESCALATION HISTORY');
-      doc.fontSize(10);
-      if (incident.escalationHistory.length > 0) {
-        incident.escalationHistory.forEach((h: any) => {
-          doc.text(`- [${new Date(h.timestamp).toLocaleString()}] ${h.userName}: ${h.reason}`);
+      doc.fillColor(primaryColor).font('Helvetica').fontSize(9);
+      const detTime = new Date(incident.detectionTime).toLocaleString();
+      doc.text(detTime, 430, startY + 30, { width: 100 });
+
+      doc.moveDown(5);
+
+      // Section Function
+      const drawSectionHeader = (title: string) => {
+        doc.moveDown();
+        const y = doc.y;
+        doc.fillColor(primaryColor).font('Helvetica-Bold').fontSize(12).text(title.toUpperCase(), 50, y);
+        doc.moveTo(50, y + 15).lineTo(550, y + 15).strokeColor(borderColor).lineWidth(1).stroke();
+        doc.moveDown(1.5);
+      };
+
+      // Section: Incident Overview
+      drawSectionHeader('Incident Overview');
+      
+      const overviewY = doc.y;
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('Alert Name:', 50, overviewY);
+      doc.fillColor(primaryColor).font('Helvetica').text(incident.alertName, 150, overviewY);
+      
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('Target Host:', 50, overviewY + 20);
+      doc.fillColor(primaryColor).font('Helvetica').text(incident.host, 150, overviewY + 20);
+      
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('Network Domain:', 50, overviewY + 40);
+      doc.fillColor(primaryColor).font('Helvetica').text(incident.domain || 'N/A', 150, overviewY + 40);
+
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('SLA Deadline:', 50, overviewY + 60);
+      const slaColor = incident.slaBreachedSent ? '#DC2626' : primaryColor;
+      doc.fillColor(slaColor).font('Helvetica-Bold').text(new Date(incident.slaDeadline).toLocaleString(), 150, overviewY + 60);
+
+      doc.moveDown(5);
+
+      // Section: Technical Description
+      drawSectionHeader('Technical Description');
+      doc.fillColor('#334155').font('Helvetica').fontSize(10).text(incident.description || 'No detailed description available.', { align: 'justify', lineGap: 3 });
+
+      doc.moveDown(2);
+
+      // Section: Assignment & Ownership
+      drawSectionHeader('Assignment & Ownership');
+      const assignY = doc.y;
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('Primary Owner:', 50, assignY);
+      doc.fillColor(primaryColor).font('Helvetica').text(incident.assignedTo, 150, assignY);
+      
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('Owner ID:', 50, assignY + 20);
+      doc.fillColor(primaryColor).font('Helvetica').text(incident.ownerId || 'Unassigned', 150, assignY + 20);
+
+      doc.moveDown(3);
+
+      // Section: Investigation & Closure
+      drawSectionHeader('Investigation & Resolution');
+      const investY = doc.y;
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('Root Cause:', 50, investY);
+      doc.fillColor(primaryColor).font('Helvetica').text(incident.rootCause || 'Under Investigation', 150, investY);
+      
+      doc.moveDown();
+      doc.fontSize(10).fillColor(secondaryColor).font('Helvetica-Bold').text('Closure Notes:', 50, doc.y);
+      doc.fillColor(primaryColor).font('Helvetica').text(incident.closureComment || 'N/A', 150, doc.y - 12);
+
+      doc.moveDown(2);
+
+      // Section: Timeline / Escalation
+      drawSectionHeader('Timeline & Escalation History');
+      if (incident.escalationHistory && incident.escalationHistory.length > 0) {
+        incident.escalationHistory.forEach((h: any, idx: number) => {
+          const entryY = doc.y;
+          doc.circle(55, entryY + 5, 3).fill(accentColor);
+          doc.fontSize(9).fillColor(primaryColor).font('Helvetica-Bold').text(new Date(h.timestamp).toLocaleString(), 70, entryY);
+          doc.fillColor(secondaryColor).font('Helvetica').text(`User: ${h.userName}`, 200, entryY);
+          doc.moveDown(0.5);
+          doc.fillColor('#475569').text(h.reason, 70, doc.y, { width: 450 });
+          doc.moveDown();
         });
       } else {
-        doc.text('No escalation history.');
+        doc.fontSize(10).fillColor(secondaryColor).font('Helvetica').text('No escalation or status changes recorded in timeline.', 50);
+      }
+
+      // Section: Metadata (Optional)
+      if (incident.metadata && Object.keys(incident.metadata).length > 0) {
+        doc.addPage(); // Start metadata on a new page if it's large
+        drawSectionHeader('Technical Metadata');
+        const metadataY = doc.y;
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(secondaryColor);
+        
+        Object.entries(incident.metadata).forEach(([key, value], idx) => {
+          if (value === null || value === undefined) return;
+          const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+          
+          const currentY = doc.y;
+          if (currentY > 700) doc.addPage();
+          
+          doc.fillColor(secondaryColor).font('Helvetica-Bold').text(`${key}:`, 50);
+          doc.fillColor(primaryColor).font('Helvetica').text(displayValue, 150, doc.y - 12);
+          doc.moveDown(0.5);
+        });
+      }
+
+      // Finalize PDF (Footer handled by page event)
+      const range = doc.bufferedPageRange();
+      for (let i = range.start; i < range.start + range.count; i++) {
+        doc.switchToPage(i);
+        
+        // Footer bar
+        doc.rect(0, doc.page.height - 50, doc.page.width, 50).fill('#F1F5F9');
+        doc.fillColor(secondaryColor).fontSize(8).font('Helvetica').text(
+          `GuardianSOC Security Platform | ${incident.ticketNumber} | Page ${i + 1} of ${range.count}`,
+          50,
+          doc.page.height - 30,
+          { align: 'center' }
+        );
       }
 
       doc.end();
