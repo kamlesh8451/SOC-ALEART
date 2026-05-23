@@ -165,19 +165,33 @@ export const incidentController = {
       values.push(id);
       const query = `UPDATE incidents SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${i}`;
       
-      await pool.query(query, values);
+      try {
+        await pool.query(query, values);
+      } catch (dbErr: any) {
+        console.error('[ERR] SQL Update Failed:', dbErr.message);
+        return res.status(500).json({ 
+          error: 'Database update failed', 
+          details: dbErr.message,
+          hint: 'Ensure your database schema is up to date with npm run init-db'
+        });
+      }
 
-      await auditService.logAction(
-        'UPDATE_INCIDENT',
-        id,
-        undefined,
-        JSON.stringify(updates),
-        req.headers['x-user-id'] as string
-      );
+      try {
+        await auditService.logAction(
+          'UPDATE_INCIDENT',
+          id,
+          undefined,
+          JSON.stringify(updates),
+          req.headers['x-user-id'] as string
+        );
+      } catch (auditErr: any) {
+        console.error('[WARN] Audit log failed but incident updated:', auditErr.message);
+      }
 
       res.json({ success: true });
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      console.error('[CRIT] Incident Update Controller Crash:', err.message);
+      res.status(500).json({ error: err.message });
     }
   },
 
