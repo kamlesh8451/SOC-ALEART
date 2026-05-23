@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CreateIncidentDialog } from './CreateIncidentDialog';
 import { IncidentDetailView } from './IncidentDetailView';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '@/lib/AuthContext';
 

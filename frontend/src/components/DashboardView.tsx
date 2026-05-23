@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { 
   Shield, AlertTriangle, CheckCircle, Clock, 
   LayoutDashboard, Ticket, Settings, ShieldAlert,
-  Activity, MoreHorizontal, LogOut, Search, Bell
+  Activity, MoreHorizontal, LogOut, Search, Bell, ShieldCheck
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
