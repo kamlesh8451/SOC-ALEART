@@ -142,9 +142,11 @@ async function startServer() {
     const httpServer = createServer(app);
     SocketService.init(httpServer);
 
-    httpServer.listen(PORT, '127.0.0.1', () => {
-      console.log(`[SYS] GuardianSOC API on http://127.0.0.1:${PORT}`);
-      console.log(`[SYS] Frontend (dev): ${frontendOrigin}`);
+    const BIND_IP = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+
+    httpServer.listen(PORT, BIND_IP, () => {
+      console.log(`[SYS] GuardianSOC API on http://${BIND_IP === '0.0.0.0' ? 'EC2-IP' : '127.0.0.1'}:${PORT}`);
+      console.log(`[SYS] Frontend Origin: ${frontendOrigin}`);
     });
 
     httpServer.on('error', (err: NodeJS.ErrnoException) => {
