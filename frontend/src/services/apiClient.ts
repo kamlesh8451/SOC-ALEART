@@ -29,7 +29,7 @@ export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<
     const text = await response.text();
     if (response.status === 500 && !text.trim()) {
       throw new Error(
-        'API returned 500 with no body — the backend is likely not running on port 3002. Run: npm run dev'
+        `API returned 500 with no body at ${url}. The backend might have crashed or be misconfigured.`
       );
     }
     throw new Error(
