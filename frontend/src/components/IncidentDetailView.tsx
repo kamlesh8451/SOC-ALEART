@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { 
   Shield, Clock, Server, AlertCircle, FileUp, CheckCircle2, 
   ArrowRight, ExternalLink, Zap, History, MessageSquare, HardDrive,
-  Link as LinkIcon, Mail
+  Link as LinkIcon, Mail, Download
 } from "lucide-react";
 import { Incident } from "../types";
 import { incidentService } from "../services/incidentService";
@@ -32,6 +32,7 @@ export function IncidentDetailView({
   role?: string
 }) {
   const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [escalating, setEscalating] = useState(false);
   const [escalationReason, setEscalationReason] = useState("");
   const [closureComment, setClosureComment] = useState("");
@@ -61,6 +62,21 @@ export function IncidentDetailView({
     fetchRelated();
     fetchLogs();
   }, [incident.id]);
+
+  const handleExportReport = async () => {
+    setExporting(true);
+    try {
+      toast.loading("Generating full incident report...");
+      await incidentService.exportOne(incident.id, incident.ticketNumber);
+      toast.dismiss();
+      toast.success("Report generated successfully");
+    } catch (err) {
+      toast.dismiss();
+      toast.error("Export failed: System report engine busy");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleEscalate = async () => {
     if (!escalationReason.trim()) {
@@ -158,17 +174,29 @@ export function IncidentDetailView({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <div className="flex items-center gap-4 mb-4">
-        <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
-          <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
-          Back to list
-        </Button>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-display font-bold text-foreground">{incident.ticketNumber}</h1>
-          <Badge className={incident.severity === 'critical' ? 'bg-primary text-white' : 'bg-orange-600 text-white'}>
-            {incident.severity}
-          </Badge>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+            <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
+            Back to list
+          </Button>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-display font-bold text-foreground">{incident.ticketNumber}</h1>
+            <Badge className={incident.severity === 'critical' ? 'bg-primary text-white' : 'bg-orange-600 text-white'}>
+              {incident.severity}
+            </Badge>
+          </div>
         </div>
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={handleExportReport}
+          disabled={exporting}
+          className="border-primary/20 text-primary hover:bg-primary/10 gap-2 uppercase font-bold text-[10px]"
+        >
+          <Download size={14} />
+          {exporting ? "Generating..." : "Export Report"}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

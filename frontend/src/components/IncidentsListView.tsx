@@ -4,7 +4,8 @@ import { Incident } from '../types';
 import { 
   Ticket, Search, Filter, ArrowUpDown, 
   MoreHorizontal, Eye, Edit2, Trash2,
-  AlertTriangle, Clock, CheckCircle, Shield, ChevronLeft
+  AlertTriangle, Clock, CheckCircle, Shield, ChevronLeft,
+  Download, Upload
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,44 @@ export const IncidentsListView: React.FC = () => {
     });
     return unsub;
   }, []);
+
+  const handleExport = async () => {
+    try {
+      toast.loading("Preparing secure export...");
+      await incidentService.exportAll();
+      toast.dismiss();
+      toast.success("Registry export complete");
+    } catch (err) {
+      toast.dismiss();
+      toast.error("Export failed: Secure link unavailable");
+    }
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const csvData = event.target?.result as string;
+        try {
+          toast.loading("Parsing and injecting records...");
+          const res = await incidentService.importCsv(csvData);
+          toast.dismiss();
+          toast.success(`Successfully imported ${res.count} records`);
+        } catch (err) {
+          toast.dismiss();
+          toast.error("Import failed: Data corruption detected");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
 
   if (selectedIncidentId) {
     const incident = incidents.find(i => i.id === selectedIncidentId);
@@ -94,13 +133,31 @@ export const IncidentsListView: React.FC = () => {
               ))}
            </div>
         </div>
-        <Button 
-          onClick={() => setIsCreateOpen(true)}
-          className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-widest text-[10px] h-11 px-6 shadow-lg shadow-cyan-600/20"
-        >
-          <Ticket className="w-4 h-4 mr-2" />
-          Manually Inject Incident
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleExport}
+            className="border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={handleImport}
+            className="border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import
+          </Button>
+          <Button 
+            onClick={() => setIsCreateOpen(true)}
+            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-widest text-[10px] h-11 px-6 shadow-lg shadow-cyan-600/20"
+          >
+            <Ticket className="w-4 h-4 mr-2" />
+            Inject
+          </Button>
+        </div>
       </div>
 
       <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl">

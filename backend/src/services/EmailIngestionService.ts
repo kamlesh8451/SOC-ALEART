@@ -33,6 +33,14 @@ export class EmailIngestionService {
     if (this.isRunning) return;
     this.isRunning = true;
     console.log('[MAIL] Email Ingestion Service worker ready');
+    
+    // Initial run
+    this.processAllMailboxes();
+    
+    // Set interval (e.g., every 60 seconds)
+    setInterval(() => {
+      this.processAllMailboxes();
+    }, 60 * 1000);
   }
 
   static async processAllMailboxes() {

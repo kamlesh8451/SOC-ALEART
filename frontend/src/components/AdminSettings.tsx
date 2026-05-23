@@ -406,7 +406,7 @@ export function AdminSettings() {
           <Card className="bg-card border-border border-l-primary border-l-2 sticky top-6">
             <CardHeader>
               <CardTitle className="text-xs font-display font-bold uppercase tracking-[0.15em] text-primary flex items-center justify-between">
-                <span>{editingId ? 'Modify Strategy' : activeTab === 'users' ? 'Provision Account' : activeTab === 'roles' ? 'Define Role' : 'Inject Routing Rule'}</span>
+                <span>{editingId ? 'Modify Strategy' : activeTab === 'users' ? 'Provision Account' : activeTab === 'roles' ? 'Define Role' : activeTab === 'mail' ? 'Configure Mail Node' : 'Inject Routing Rule'}</span>
                 {editingId && (
                   <button onClick={cancelEdit} className="text-muted-foreground hover:text-foreground">
                     <X className="w-3 h-3" />
@@ -418,6 +418,100 @@ export function AdminSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
+              {activeTab === 'mail' && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">IMAP Server Host</label>
+                    <Input 
+                      value={mailSettings.host} 
+                      onChange={e => setMailSettings({...mailSettings, host: e.target.value})} 
+                      placeholder="imap.gmail.com" 
+                      className="bg-secondary border-border h-10 text-xs font-mono" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Port</label>
+                      <Input 
+                        type="number"
+                        value={mailSettings.port} 
+                        onChange={e => setMailSettings({...mailSettings, port: parseInt(e.target.value)})} 
+                        placeholder="993" 
+                        className="bg-secondary border-border h-10 text-xs font-mono" 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">SSL / TLS</label>
+                      <div className="flex items-center gap-2 h-10">
+                        <button 
+                          onClick={() => setMailSettings({...mailSettings, ssl: !mailSettings.ssl})}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-1 rounded border text-[9px] font-bold uppercase transition-all w-full h-full",
+                            mailSettings.ssl ? "bg-primary/10 border-primary text-primary" : "bg-secondary border-border text-muted-foreground"
+                          )}
+                        >
+                          {mailSettings.ssl ? <ShieldCheck className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                          {mailSettings.ssl ? "Secure" : "Plain"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Auth Identifier (User)</label>
+                    <Input 
+                      value={mailSettings.username} 
+                      onChange={e => setMailSettings({...mailSettings, username: e.target.value})} 
+                      placeholder="soc-alert@example.com" 
+                      className="bg-secondary border-border h-10 text-xs font-mono" 
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Secret Key (Password)</label>
+                    <Input 
+                      type="password"
+                      value={mailSettings.password} 
+                      onChange={e => setMailSettings({...mailSettings, password: e.target.value})} 
+                      placeholder="••••••••••••" 
+                      className="bg-secondary border-border h-10 text-xs font-mono" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Poll Interval (Sec)</label>
+                      <Input 
+                        type="number"
+                        value={mailSettings.poll_interval} 
+                        onChange={e => setMailSettings({...mailSettings, poll_interval: parseInt(e.target.value)})} 
+                        placeholder="60" 
+                        className="bg-secondary border-border h-10 text-xs font-mono" 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Status</label>
+                      <div className="flex items-center gap-2 h-10">
+                        <button 
+                          onClick={() => setMailSettings({...mailSettings, is_active: !mailSettings.is_active})}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-1 rounded border text-[9px] font-bold uppercase transition-all w-full h-full",
+                            mailSettings.is_active ? "bg-green-500/10 border-green-500/30 text-green-500" : "bg-red-500/10 border-red-500/30 text-red-500"
+                          )}
+                        >
+                          {mailSettings.is_active ? <CheckCircle2 className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                          {mailSettings.is_active ? "Enabled" : "Paused"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    onClick={handleSaveMailSettings} 
+                    className="w-full bg-primary hover:opacity-90 h-10 text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-primary/20 mt-2"
+                    disabled={loading}
+                  >
+                    {loading ? "Synchronizing..." : "Commit Mail Configuration"}
+                  </Button>
+                </div>
+              )}
               {activeTab === 'users' && (
                 <>
                   <div className="space-y-3">

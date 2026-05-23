@@ -138,5 +138,41 @@ export const incidentService = {
       compliance: number;
       velocity: Array<{ name: string; open: number; closed: number }>;
     }>("/api/incidents/stats");
+  },
+
+  async exportAll() {
+    const response = await apiFetch("/api/incidents/export");
+    if (!response.ok) throw new Error("Failed to export incidents");
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `incidents_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  async exportOne(id: string, ticketNumber: string) {
+    const response = await apiFetch(`/api/incidents/${id}/export`);
+    if (!response.ok) throw new Error("Failed to export incident report");
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `incident_${ticketNumber}_report.txt`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  async importCsv(csvData: string) {
+    return apiJson("/api/incidents/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csvData }),
+    });
   }
 };

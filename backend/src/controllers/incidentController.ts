@@ -271,4 +271,164 @@ export const incidentController = {
       next(err);
     }
   },
+
+  async exportAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await pool.query('SELECT * FROM incidents ORDER BY detection_time DESC');
+      const rows = result.rows.map(mapIncident);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'No incidents to export' });
+      }
+
+      const headers = Object.keys(rows[0]);
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => headers.map(header => {
+          const val = (row as any)[header];
+          if (val === null || val === undefined) return '';
+          const str = String(val).replace(/"/g, '""');
+          return str.includes(',') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
+        }).join(','))
+      ].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=incidents_export_${new Date().toISOString().split('T')[0]}.csv`);
+      res.send(csvContent);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async exportOne(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const result = await pool.query('SELECT * FROM incidents WHERE id = $1', [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Incident not found' });
+      }
+
+      const incident = mapIncident(result.rows[0]);
+      
+      // For a specific ticket, we might want a more detailed text/markdown report
+      const report = `
+GUARDIANSOC INCIDENT REPORT
+===========================
+Ticket Number: ${incident.ticketNumber}
+ID: ${incident.id}
+Status: ${incident.status.toUpperCase()}
+Severity: ${incident.severity.toUpperCase()}
+
+DETECTION INFO
+--------------
+Alert Name: ${incident.alertName}
+Host: ${incident.host}
+Domain: ${incident.domain}
+Detection Time: ${new Date(incident.detectionTime).toLocaleString()}
+SLA Deadline: ${new Date(incident.slaDeadline).toLocaleString()}
+
+DESCRIPTION
+-----------
+${incident.description || 'No description provided.'}
+
+ASSIGNMENT
+----------
+Assigned To: ${incident.assignedTo}
+Owner ID: ${incident.ownerId}
+
+INVESTIGATION
+-------------
+Root Cause: ${incident.rootCause || 'N/A'}
+Closure Comment: ${incident.closureComment || 'N/A'}
+Evidence: ${incident.evidenceUrl || 'No evidence linked'}
+
+TIMESTAMPS
+----------
+Created At: ${incident.createdAt}
+Updated At: ${incident.updatedAt}
+
+ESCALATION HISTORY
+------------------
+${incident.escalationHistory.length > 0 
+  ? incident.escalationHistory.map((h: any) => `- [${new Date(h.timestamp).toLocaleString()}] ${h.userName}: ${h.reason}`).join('\n')
+  : 'No escalation history.'}
+      `.trim();
+
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', `attachment; filename=incident_${incident.ticketNumber}_report.txt`);
+      res.send(report);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async importCsv(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { csvData } = req.body;
+      if (!csvData) return res.status(400).json({ error: 'No CSV data provided' });
+
+      const lines = csvData.split('\n');
+      if (lines.length < 2) return res.status(400).json({ error: 'Invalid CSV format' });
+
+      const headers = lines[0].split(',').map((h: string) => h.trim());
+      const results = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Simple CSV parser (doesn't handle quoted commas well, but for simple SOC export/import it's okay)
+        // A better one would use a regex or a lib.
+        const values = line.split(',').map((v: string) => v.trim().replace(/^"|"$/g, ''));
+        const data: any = {};
+        headers.forEach((h: string, index: number) => {
+          data[h] = values[index];
+        });
+
+        // Map fields to DB
+        const id = uuidv4();
+        const ticketNumber = await generateUniqueTicketNumber();
+        const now = Date.now();
+        const severity = data.severity || 'medium';
+        const slaDeadline = now + slaHoursForSeverity(severity) * 60 * 60 * 1000;
+
+        await pool.query(
+          `INSERT INTO incidents (
+            id, ticket_number, alert_name, severity, host, description, detection_time, sla_deadline,
+            status, owner_id, domain, assigned_to, source
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            id,
+            ticketNumber,
+            data.alertName || data.alert_name || 'Imported Alert',
+            severity,
+            data.host || 'unknown',
+            data.description || '',
+            now,
+            slaDeadline,
+            data.status || 'open',
+            'unassigned',
+            data.domain || '',
+            'Unassigned',
+            'IMPORT'
+          ]
+        );
+        results.push(ticketNumber);
+      }
+
+      await auditService.logAction(
+        'IMPORT_INCIDENTS',
+        undefined,
+        undefined,
+        `Imported ${results.length} incidents from CSV`,
+        req.headers['x-user-id'] as string
+      );
+
+      res.json({ success: true, count: results.length, tickets: results });
+    } catch (err) {
+      next(err);
+    }
+  },
 };
+
