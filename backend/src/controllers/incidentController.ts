@@ -56,15 +56,18 @@ function slaHoursForSeverity(severity: string): number {
 
 async function generateUniqueTicketNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  // Find the highest ticket number for the current year
+  // Find the highest ticket number for the current year using numeric sorting
+  // We filter for sequence numbers with less than 4 digits to "start fresh" with SOC-1
+  // while ignoring the old 4-digit random-looking numbers.
   const result = await pool.query(
     `SELECT ticket_number FROM incidents 
      WHERE ticket_number LIKE $1 
-     ORDER BY ticket_number DESC LIMIT 1`,
+     AND length(split_part(ticket_number, '-', 2)) < 4
+     ORDER BY CAST(split_part(ticket_number, '-', 2) AS INTEGER) DESC LIMIT 1`,
     [`SOC-%-${year}`]
   );
 
-  let nextSeq = 1001;
+  let nextSeq = 1;
   if (result.rows.length > 0) {
     const lastTicket = result.rows[0].ticket_number;
     const match = lastTicket.match(/SOC-(\d+)-/);

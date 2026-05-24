@@ -30,7 +30,14 @@ const getBackendRoot = () => {
     return path.resolve(__dirname, '..');
   }
   // ESM (Development/tsx)
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  try {
+    // @ts-ignore - import.meta is available in ESM
+    const url = import.meta.url;
+    if (url) return path.resolve(path.dirname(fileURLToPath(url)), '..');
+  } catch (e) {
+    // Fallback if import.meta is not available or throws
+  }
+  return process.cwd();
 };
 
 const backendRoot = getBackendRoot();
@@ -211,8 +218,8 @@ async function startServer() {
     } else {
       console.log('[SYS] Skipping automatic schema migrations in production.');
     }
-    slaService.startMonitor();
-    EmailIngestionService.start();
+    
+    // Automation Engine handles background task orchestration
     await queueService.init();
 
     const httpServer = createServer(app);

@@ -33,6 +33,18 @@ export const DashboardView: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
 
+  useEffect(() => {
+    // Basic Deep Linking for email buttons
+    const params = new URLSearchParams(window.location.search);
+    const incidentId = params.get('incidentId');
+    if (incidentId) {
+      handleViewIncident(incidentId);
+      // Clean up the URL to prevent re-triggering on refresh
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
   const handleViewIncident = (id: string) => {
     setInitialIncidentId(id);
     setCurrentView('incidents');

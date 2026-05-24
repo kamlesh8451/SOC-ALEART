@@ -2,13 +2,13 @@ import nodemailer from 'nodemailer';
 import pool from '../config/db';
 
 const APP_URL = process.env.APP_URL || `http://localhost:${process.env.PORT || 3001}`;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 async function getTransporter() {
-  const result = await pool.query('SELECT * FROM mailbox_settings WHERE is_active = TRUE LIMIT 1');
-  if (result.rows.length === 0) {
-    console.warn('[NOTIFY] No active mailbox for sending notifications. Using ENV defaults.');
+  // Priority 1: Direct SMTP environment variables
+  if (process.env.SMTP_HOST) {
     return nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '465'),
       secure: process.env.SMTP_SECURE !== 'false',
       auth: {
@@ -18,15 +18,29 @@ async function getTransporter() {
     });
   }
 
-  const settings = result.rows[0];
-  // Gmail SMTP is typically smtp.gmail.com / 465
+  // Priority 2: Use active mailbox settings
+  const result = await pool.query('SELECT * FROM mailbox_settings WHERE is_active = TRUE LIMIT 1');
+  if (result.rows.length > 0) {
+    const settings = result.rows[0];
+    return nodemailer.createTransport({
+      host: settings.host.replace('imap.', 'smtp.'),
+      port: parseInt(process.env.SMTP_PORT || '465'),
+      secure: process.env.SMTP_SECURE !== 'false',
+      auth: {
+        user: settings.username,
+        pass: settings.password,
+      },
+    });
+  }
+
+  // Fallback (might fail if credentials missing)
   return nodemailer.createTransport({
-    host: settings.host.replace('imap.', 'smtp.'),
+    host: 'smtp.gmail.com',
     port: 465,
     secure: true,
     auth: {
-      user: settings.username,
-      pass: settings.password,
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
     },
   });
 }
@@ -34,6 +48,7 @@ async function getTransporter() {
 function actionLink(ticketId: string, action: string, reason?: string) {
   const params = new URLSearchParams({ ticketId, action });
   if (reason) params.set('reason', reason);
+  // Action links go to the BACKEND API
   return `${APP_URL}/api/tickets/confirm-action?${params.toString()}`;
 }
 
@@ -88,9 +103,9 @@ export function buildNotificationEmail(
   };
 
   const confirmUrl = actionLink(incident.id, 'CONFIRM_CLOSED');
-  const updateUrl = `${APP_URL}/incidents/${incident.id}`;
+  const updateUrl = `${FRONTEND_URL}?incidentId=${incident.id}`;
   const escalateUrl = actionLink(incident.id, 'ESCALATE');
-  const syricUrl = `${APP_URL}/api/incidents/${incident.id}/syric`;
+  const syricUrl = `${FRONTEND_URL}?incidentId=${incident.id}&view=syric`; 
 
   // Parse metadata if available
   let metadata: any = {};

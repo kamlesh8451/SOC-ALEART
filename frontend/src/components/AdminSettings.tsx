@@ -141,15 +141,19 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
   const handleSaveMailSettings = async () => {
     setLoading(true);
     try {
-      // Map frontend poll_interval to backend expected field if necessary, 
-      // but backend already expects poll_interval.
-      await mailService.updateSettings(mailSettings);
+      const payload = { ...mailSettings };
+      // Don't send empty password if user didn't type one
+      if (!payload.password || payload.password.trim().length === 0) {
+        delete payload.password;
+      }
+      
+      await mailService.updateSettings(payload);
       toast.success("Mail integration updated and service synchronized");
       // Clear password field for security after successful save
       setMailSettings({ ...mailSettings, password: '' });
       fetchMailData();
     } catch (e) {
-      toast.error("Update failed");
+      toast.error("Protocol synchronization failed. Check server logs.");
     } finally {
       setLoading(false);
     }

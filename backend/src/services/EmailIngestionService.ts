@@ -35,14 +35,6 @@ export class EmailIngestionService {
     if (this.isRunning) return;
     this.isRunning = true;
     console.log('[MAIL] Email Ingestion Service worker ready');
-    
-    // Initial run
-    this.processAllMailboxes();
-    
-    // Set interval (Reduced to 10 seconds for high reflectivity)
-    setInterval(() => {
-      this.processAllMailboxes();
-    }, 10 * 1000);
   }
 
   static async processAllMailboxes() {
@@ -63,28 +55,24 @@ export class EmailIngestionService {
       port: settings.port,
       secure: settings.ssl,
       tls: {
-        rejectUnauthorized: process.env.NODE_ENV === 'production' ? true : false
+        rejectUnauthorized: false
       },
       auth: {
         user: settings.username,
         pass: settings.password
       },
-      logger: false, // Disable extremely verbose logging
-      qresync: true,
-      connectionTimeout: 30000, // 30 seconds
+      logger: false,
+      connectionTimeout: 30000,
       greetingTimeout: 30000,
     });
 
     client.on('error', (err) => {
-      console.error('[MAIL] ImapFlow background error:', err.message || err);
-    });
-
-    client.on('close', () => {
-      console.log('[MAIL] ImapFlow connection closed');
+      console.error(`[MAIL] ImapFlow Protocol Error (${settings.username}):`, err.message || err);
     });
 
     try {
       await client.connect();
+      console.log(`[MAIL] Connected successfully to ${settings.host} (${settings.username})`);
       const lock = await client.getMailboxLock('INBOX');
       try {
         // Optimized: Only search for UNSEEN emails to avoid re-processing 
@@ -167,7 +155,7 @@ export class EmailIngestionService {
     }
 
     // Check for Ticket Ref in subject
-    const ticketRefMatch = subject.match(/SOC-\d{4}-\d{4}/);
+    const ticketRefMatch = subject.match(/SOC-\d+-\d{4}/);
     if (!existingIncidentId && ticketRefMatch) {
       const refResult = await pool.query('SELECT id FROM incidents WHERE ticket_number = $1', [ticketRefMatch[0]]);
       if (refResult.rows.length > 0) existingIncidentId = refResult.rows[0].id;
@@ -338,15 +326,29 @@ export class EmailIngestionService {
     return 72;
   }
 
-  private static async generateUniqueTicketNumber() {
+  private static async generateUniqueTicketNumber(): Promise<string> {
     const year = new Date().getFullYear();
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const ticketNumber = `SOC-${Math.floor(1000 + Math.random() * 9000)}-${year}`;
-      const result = await pool.query('SELECT 1 FROM incidents WHERE ticket_number = $1', [ticketNumber]);
-      if (result.rows.length === 0) return ticketNumber;
+    // Find the highest ticket number for the current year using numeric sorting
+    // We filter for sequence numbers with less than 4 digits to "start fresh" with SOC-1
+    // while ignoring the old 4-digit random-looking numbers.
+    const result = await pool.query(
+      `SELECT ticket_number FROM incidents 
+       WHERE ticket_number LIKE $1 
+       AND length(split_part(ticket_number, '-', 2)) < 4
+       ORDER BY CAST(split_part(ticket_number, '-', 2) AS INTEGER) DESC LIMIT 1`,
+      [`SOC-%-${year}`]
+    );
+
+    let nextSeq = 1;
+    if (result.rows.length > 0) {
+      const lastTicket = result.rows[0].ticket_number;
+      const match = lastTicket.match(/SOC-(\d+)-/);
+      if (match) {
+        nextSeq = parseInt(match[1]) + 1;
+      }
     }
 
-    throw new Error('Failed to generate a unique ticket number for new incident');
+    return `SOC-${nextSeq}-${year}`;
   }
 
   private static async handleAttachments(incidentId: string, parsed: any) {

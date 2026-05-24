@@ -171,6 +171,25 @@ export const ticketController = {
           'Closed via email link'
         );
         successMessage = 'Incident closed successfully.';
+      } else if (action === 'ESCALATE') {
+        const history = incident.escalation_history || [];
+        history.push({
+          reason: (reason as string) || 'Escalated via email link',
+          timestamp: Date.now(),
+          userId: 'email_link',
+          userName: 'Email Command',
+        });
+        await pool.query(
+          "UPDATE incidents SET status = 'escalated', escalation_history = $1, updated_at = NOW() WHERE id = $2",
+          [JSON.stringify(history), ticketId]
+        );
+        await auditService.logAction(
+          'ESCALATE_EMAIL',
+          ticketId as string,
+          incident.ticket_number,
+          `Escalated via email: ${reason || 'Not specified'}`
+        );
+        successMessage = 'Incident escalated to SOC Lead.';
       } else if (action === 'NOT_CLOSED') {
         await auditService.logAction(
           'ACK_NOT_CLOSED',

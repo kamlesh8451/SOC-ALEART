@@ -14,8 +14,19 @@ export const settingsController = {
 
   async updateMailboxSettings(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      let { id } = req.params;
       const { host, port, ssl, username, password, poll_interval, is_active } = req.body;
+
+      // If no ID is provided, try to find the first mailbox
+      if (!id || id === 'undefined' || id === 'null') {
+        const first = await pool.query('SELECT id FROM mailbox_settings LIMIT 1');
+        if (first.rows.length > 0) {
+          id = first.rows[0].id;
+        } else {
+          // If none exists, we should probably create one or return error
+          return res.status(404).json({ error: 'No mailbox settings found to update' });
+        }
+      }
 
       const fields: string[] = [];
       const values: unknown[] = [];
@@ -25,7 +36,11 @@ export const settingsController = {
       if (port !== undefined) { fields.push(`port = $${i++}`); values.push(port); }
       if (ssl !== undefined) { fields.push(`ssl = $${i++}`); values.push(ssl); }
       if (username) { fields.push(`username = $${i++}`); values.push(username); }
-      if (password) { fields.push(`password = $${i++}`); values.push(password); }
+      // Only update password if a non-empty string is provided
+      if (password && password.trim().length > 0) { 
+        fields.push(`password = $${i++}`); 
+        values.push(password); 
+      }
       if (poll_interval !== undefined) { fields.push(`poll_interval = $${i++}`); values.push(poll_interval); }
       if (is_active !== undefined) { fields.push(`is_active = $${i++}`); values.push(is_active); }
 
@@ -43,7 +58,7 @@ export const settingsController = {
         undefined,
         undefined,
         `Updated mailbox ID: ${id}, user: ${username || 'N/A'}`,
-        req.headers['x-user-id'] as string
+        'system' // In a real app, use req.user.id
       );
 
       res.json({ success: true });

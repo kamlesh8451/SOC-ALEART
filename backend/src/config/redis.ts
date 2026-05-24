@@ -19,9 +19,10 @@ const redisConfig = {
   host: process.env.REDIS_HOST || '127.0.0.1',
   port: parseInt(process.env.REDIS_PORT || '6379'),
   maxRetriesPerRequest: null,
+  lazyConnect: true, // Don't connect immediately
   // Completely silent retry strategy
   retryStrategy: (times: number) => {
-    return 15000; // Retry every 15 seconds
+    return 30000; // Retry every 30 seconds
   },
   enableOfflineQueue: false, // Don't queue commands if Redis is down
   connectTimeout: 2000,      // Fail fast
@@ -40,10 +41,10 @@ export const redisConnection = new Redis(redisConfig);
 let lastWarned = 0;
 redisConnection.on('error', (err: any) => {
   const now = Date.now();
-  // Only log a quiet warning once per minute
-  if (now - lastWarned > 60000) {
+  // Only log a quiet warning once every 5 minutes
+  if (now - lastWarned > 300000) {
     if (err.code === 'ECONNREFUSED') {
-      console.warn('[REDIS] Background services are offline (Redis connection refused). This is expected if Redis is not installed.');
+      console.warn('[REDIS] Background services (BullMQ) are in fallback mode because Redis is not reachable. This is expected if Redis is not installed.');
     } else {
       console.warn(`[REDIS] Connection issue: ${err.message}`);
     }
