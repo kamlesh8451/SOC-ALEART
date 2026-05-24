@@ -230,7 +230,14 @@ export const reportController = {
       const hours = parseInt(timeRange as string) || 24;
       const startTime = Date.now() - hours * 60 * 60 * 1000;
 
-      const statsRes = await pool.query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = "closed") as resolved FROM incidents WHERE detection_time >= $1', [startTime]);
+      const statsRes = await pool.query(`
+        SELECT 
+          COUNT(*) as total, 
+          COUNT(*) FILTER (WHERE status = 'closed') as resolved,
+          COUNT(*) FILTER (WHERE severity = 'critical') as critical
+        FROM incidents 
+        WHERE detection_time >= $1
+      `, [startTime]);
       const stats = statsRes.rows[0];
 
       res.setHeader('Content-Type', 'application/pdf');
@@ -245,12 +252,17 @@ export const reportController = {
 
       doc.moveDown(6);
       doc.fillColor('#0F172A').fontSize(14).text('TACTICAL PERFORMANCE OVERVIEW', 50);
-      doc.rect(50, doc.y + 5, 500, 1).fill('#E2E8F0');
+      doc.moveTo(50, doc.y + 5).lineTo(550, doc.y + 5).strokeColor('#E2E8F0').stroke();
       doc.moveDown(2);
 
-      doc.fontSize(12).text(`Total Incidents Detected: ${stats.total}`);
-      doc.text(`Incidents Successfully Resolved: ${stats.resolved}`);
-      doc.text(`Neutralization Rate: ${stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 100}%`);
+      doc.fillColor('#334155').fontSize(11).font('Helvetica');
+      doc.text(`Total Security Incidents Identified: ${stats.total}`);
+      doc.text(`Threats Successfully Neutralized: ${stats.resolved}`);
+      doc.text(`Critical Vulnerabilities Detected: ${stats.critical}`);
+      
+      const rate = stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 100;
+      doc.moveDown();
+      doc.fontSize(12).font('Helvetica-Bold').text(`Global Neutralization Rate: ${rate}%`);
 
       doc.end();
     } catch (err) {
@@ -262,6 +274,22 @@ export const reportController = {
     try {
       const { timeRange } = req.query;
       const hours = parseInt(timeRange as string) || 24;
+      const startTime = Date.now() - hours * 60 * 60 * 1000;
+
+      const result = await pool.query(`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE detection_time + (24 * 60 * 60 * 1000) < resolved_at OR (status != 'closed' AND detection_time + (24 * 60 * 60 * 1000) < extract(epoch from now()) * 1000)) as breaches,
+          AVG(acknowledged_at - detection_time) / 1000 / 60 as avg_mtta_min,
+          AVG(resolved_at - acknowledged_at) / 1000 / 60 / 60 as avg_mttr_hr
+        FROM incidents
+        WHERE detection_time >= $1
+      `, [startTime]);
+
+      const stats = result.rows[0];
+      const total = parseInt(stats.total || '0');
+      const breaches = parseInt(stats.breaches || '0');
+      const compliance = total > 0 ? Math.round(((total - breaches) / total) * 100) : 100;
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=SLA_Compliance_${hours}h.pdf`);
@@ -275,8 +303,17 @@ export const reportController = {
 
       doc.moveDown(6);
       doc.fillColor('#0F172A').fontSize(14).text('COMPLIANCE METRICS', 50);
+      doc.moveTo(50, doc.y + 5).lineTo(550, doc.y + 5).strokeColor('#E2E8F0').stroke();
+      doc.moveDown(2);
+
+      doc.fillColor('#334155').fontSize(11).font('Helvetica');
+      doc.text(`Total Tracked Incidents: ${total}`);
+      doc.text(`Service Level Breaches: ${breaches}`);
+      doc.text(`Avg Time to Acknowledge (MTTA): ${Math.round(parseFloat(stats.avg_mtta_min || '0'))} minutes`);
+      doc.text(`Avg Time to Resolve (MTTR): ${Math.round(parseFloat(stats.avg_mttr_hr || '0') * 10) / 10} hours`);
+      
       doc.moveDown();
-      doc.fontSize(10).text('Full compliance data integrated via command console telemetry.');
+      doc.fontSize(12).font('Helvetica-Bold').text(`Overall Compliance Score: ${compliance}%`);
 
       doc.end();
     } catch (err) {
@@ -288,6 +325,24 @@ export const reportController = {
     try {
       const { timeRange } = req.query;
       const hours = parseInt(timeRange as string) || 24;
+      const startTime = Date.now() - hours * 60 * 60 * 1000;
+
+      const result = await pool.query(`
+        SELECT metadata->'threatIntel' as intel
+        FROM incidents
+        WHERE detection_time >= $1 AND metadata->'threatIntel' IS NOT NULL
+      `, [startTime]);
+
+      const indicators: any[] = [];
+      result.rows.forEach(row => {
+        if (row.intel && row.intel.indicators) {
+          indicators.push(...row.intel.indicators);
+        }
+      });
+
+      // Deduplicate and sort by score
+      const uniqueIndicators = Array.from(new Map(indicators.map(i => [i.value, i])).values())
+        .sort((a: any, b: any) => b.score - a.score);
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=Threat_Intelligence_${hours}h.pdf`);
@@ -301,8 +356,20 @@ export const reportController = {
 
       doc.moveDown(6);
       doc.fillColor('#0F172A').fontSize(14).text('IDENTIFIED INDICATORS OF COMPROMISE', 50);
-      doc.moveDown();
-      doc.fontSize(10).text('Aggregated IoC list extracted from neural correlation metadata.');
+      doc.moveTo(50, doc.y + 5).lineTo(550, doc.y + 5).strokeColor('#E2E8F0').stroke();
+      doc.moveDown(2);
+
+      if (uniqueIndicators.length === 0) {
+        doc.fontSize(10).fillColor('#64748B').text('No Indicators of Compromise (IoCs) identified in current time window.');
+      } else {
+        uniqueIndicators.forEach((ioc: any, idx: number) => {
+          if (doc.y > 700) doc.addPage();
+          
+          doc.fillColor(ioc.score > 70 ? '#DC2626' : '#0F172A').fontSize(10).font('Helvetica-Bold').text(`${ioc.value}`, 50);
+          doc.fillColor('#64748B').fontSize(8).font('Helvetica').text(`TYPE: ${ioc.type.toUpperCase()} | RISK SCORE: ${ioc.score} | SOURCE: ${ioc.provider}`, 50);
+          doc.moveDown(1);
+        });
+      }
 
       doc.end();
     } catch (err) {

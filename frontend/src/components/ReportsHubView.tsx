@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { apiJson, apiFetch } from '@/services/apiClient';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type ReportType = 'executive' | 'sla' | 'intel';
+type ReportType = 'executive' | 'sla' | 'threat-intel';
 type TimeRange = '24h' | '168h' | '720h' | 'all';
 
 export const ReportsHubView: React.FC = () => {
@@ -37,7 +37,7 @@ export const ReportsHubView: React.FC = () => {
       color: 'orange'
     },
     { 
-      id: 'intel', 
+      id: 'threat-intel', 
       title: 'Threat Intel Digest', 
       description: 'Aggregated Indicators of Compromise (IoCs) and malicious entity reputation scores.',
       icon: ShieldAlert,
@@ -272,7 +272,7 @@ export const ReportsHubView: React.FC = () => {
                           </div>
                         )}
 
-                        {selectedReport === 'intel' && previewData && (
+                        {selectedReport === 'threat-intel' && previewData && (
                           <div className="space-y-6">
                              <div className="flex items-center justify-between">
                                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recent Indicators of Compromise</h4>
