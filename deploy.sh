@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e # Exit on error
 
 # --- GuardianSOC Optimized EC2 Deployment Script ---
 # This version skips redundant installs and uses faster build patterns.
@@ -99,5 +100,19 @@ echo "============================================"
 echo "DEPLOYMENT OPTIMIZED & COMPLETE!"
 echo "SOC Dashboard: http://$EC2_IP"
 echo "Backend API: http://$EC2_IP:3001"
-echo "Registry Status: OPERATIONAL"
+echo "--------------------------------------------"
+echo "DIAGNOSTICS:"
+if sudo netstat -tulpn | grep :3001 > /dev/null; then
+  echo "✅ Backend listening on port 3001"
+else
+  echo "❌ Backend NOT listening on port 3001. Check 'pm2 logs soc-backend'"
+fi
+
+if sudo netstat -tulpn | grep :80 > /dev/null; then
+  echo "✅ Frontend listening on port 80"
+else
+  echo "❌ Frontend NOT listening on port 80. Check 'pm2 logs soc-frontend'"
+fi
+echo "--------------------------------------------"
+echo "IMPORTANT: Ensure Port 3001 and Port 80 are open in your AWS Security Group!"
 echo "============================================"
