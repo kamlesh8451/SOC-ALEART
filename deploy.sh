@@ -90,29 +90,41 @@ cd ..
 sudo pm2 serve frontend/dist 80 --name "soc-frontend" --spa
 
 echo "[6/6] Finalizing Stability..."
-pm2 save
-# Only run startup if not already configured
-if ! grep -q "pm2" /etc/rc.local 2>/dev/null; then
-    sudo pm2 startup | tail -n 1 | bash
-fi
+pm2 save || true
 
 echo "============================================"
-echo "DEPLOYMENT OPTIMIZED & COMPLETE!"
+echo "DEPLOYMENT COMPLETE!"
 echo "SOC Dashboard: http://$EC2_IP"
 echo "Backend API: http://$EC2_IP:3001"
 echo "--------------------------------------------"
 echo "DIAGNOSTICS:"
-if sudo netstat -tulpn | grep :3001 > /dev/null; then
-  echo "✅ Backend listening on port 3001"
-else
-  echo "❌ Backend NOT listening on port 3001. Check 'pm2 logs soc-backend'"
+
+# Check if port 3001 is listening (using ss which is more modern than netstat)
+if command -v ss &> /dev/null; then
+  if sudo ss -tulpn | grep :3001 > /dev/null; then
+    echo "✅ Backend (Node.js) is listening on port 3001"
+  else
+    echo "❌ Backend NOT listening on port 3001. Check logs: 'pm2 logs soc-backend'"
+  fi
+elif command -v netstat &> /dev/null; then
+  if sudo netstat -tulpn | grep :3001 > /dev/null; then
+    echo "✅ Backend (Node.js) is listening on port 3001"
+  else
+    echo "❌ Backend NOT listening on port 3001. Check logs: 'pm2 logs soc-backend'"
+  fi
 fi
 
-if sudo netstat -tulpn | grep :80 > /dev/null; then
-  echo "✅ Frontend listening on port 80"
-else
-  echo "❌ Frontend NOT listening on port 80. Check 'pm2 logs soc-frontend'"
+# Check port 80
+if command -v ss &> /dev/null; then
+  if sudo ss -tulpn | grep :80 > /dev/null; then
+    echo "✅ Frontend (Nginx/PM2) is listening on port 80"
+  else
+    echo "❌ Frontend NOT listening on port 80. Check logs: 'pm2 logs soc-frontend'"
+  fi
 fi
+
 echo "--------------------------------------------"
-echo "IMPORTANT: Ensure Port 3001 and Port 80 are open in your AWS Security Group!"
+echo "SECURITY GROUP CHECK:"
+echo "1. Go to AWS Console > EC2 > Security Groups"
+echo "2. Ensure Inbound Rules allow PORT 80 and PORT 3001 from 0.0.0.0/0"
 echo "============================================"
