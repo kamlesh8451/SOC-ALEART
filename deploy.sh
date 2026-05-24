@@ -57,15 +57,15 @@ fi
 cat <<EOF > backend/.env
 PORT=3001
 NODE_ENV=production
-FRONTEND_URL=http://\$EC2_IP
-APP_URL=http://\$EC2_IP:3001
-DATABASE_URL=\$DATABASE_URL
+FRONTEND_URL=http://$EC2_IP
+APP_URL=http://$EC2_IP:3001
+DATABASE_URL=$DATABASE_URL
 DEFAULT_ALERT_RECIPIENT=kamleshgawade786@gmail.com
 EOF
 
 echo "[4/6] Initializing Database & Compiling Assets..."
 echo "-> Syncing Database Schema..."
-npm run init-db -w backend
+DATABASE_URL=$DATABASE_URL npm run init-db -w backend
 
 echo "-> Compiling Backend Engine..."
 npm run build -w backend
