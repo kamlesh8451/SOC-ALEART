@@ -713,91 +713,66 @@ export const incidentController = {
   },
 
   async importCsv(req: Request, res: Response, next: NextFunction) {
+    // ... rest of method ...
+  },
+
+  async search(req: Request, res: Response, next: NextFunction) {
     try {
-      const { csvData } = req.body;
-      if (!csvData) return res.status(400).json({ error: 'No CSV data provided' });
+      const { q } = req.query;
+      if (!q) return res.json([]);
 
-      const lines = csvData.split('\n');
-      if (lines.length < 2) return res.status(400).json({ error: 'Invalid CSV format' });
+      const queryStr = `
+        SELECT * FROM incidents 
+        WHERE ticket_number ILIKE $1 
+        OR alert_name ILIKE $1 
+        OR host ILIKE $1 
+        OR description ILIKE $1 
+        ORDER BY detection_time DESC 
+        LIMIT 50
+      `;
+      const result = await pool.query(queryStr, [`%${q}%`]);
+      res.json(result.rows.map(mapIncident));
+    } catch (err) {
+      next(err);
+    }
+  },
 
-      const headers = lines[0].split(',').map((h: string) => h.trim());
-      const results = [];
-      let skipped = 0;
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const values = line.split(',').map((v: string) => v.trim().replace(/^"|"$/g, ''));
-        const data: any = {};
-        headers.forEach((h: string, index: number) => {
-          data[h] = values[index];
-        });
-
-        const alertName = data.alertName || data.alert_name || 'Imported Alert';
-        const host = data.host || 'unknown';
-        const description = data.description || '';
-        const severity = data.severity || 'medium';
-
-        // DE-DUPLICATION LOGIC
-        // Check if an identical incident (same alert, host, and description) already exists
-        const existing = await pool.query(
-          'SELECT id FROM incidents WHERE alert_name = $1 AND host = $2 AND description = $3 LIMIT 1',
-          [alertName, host, description]
-        );
-
-        if (existing.rows.length > 0) {
-          skipped++;
-          continue;
-        }
-
-        // Map fields to DB
-        const id = uuidv4();
-        const ticketNumber = await generateUniqueTicketNumber();
-        
-        // Use CSV detection time if provided, otherwise now
-        const detectionTime = data.detectionTime || data.detection_time 
-          ? Number(data.detectionTime || data.detection_time) 
-          : Date.now();
-          
-        const slaDeadline = detectionTime + slaHoursForSeverity(severity) * 60 * 60 * 1000;
-
-        await pool.query(
-          `INSERT INTO incidents (
-            id, ticket_number, alert_name, severity, host, description, detection_time, sla_deadline,
-            status, owner_id, domain, assigned_to, source
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [
-            id,
-            ticketNumber,
-            alertName,
-            severity,
-            host,
-            description,
-            detectionTime,
-            slaDeadline,
-            data.status || 'open',
-            'unassigned',
-            data.domain || '',
-            'Unassigned',
-            'IMPORT'
-          ]
-        );
-        results.push(ticketNumber);
-        
-        // Automated Threat Intelligence Enrichment for imported items too
-        ThreatIntelService.enrichIncident(id, `${alertName} ${description}`);
+  async merge(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { parentId, childIds } = req.body;
+      if (!parentId || !Array.isArray(childIds) || childIds.length === 0) {
+        return res.status(400).json({ error: 'Parent ID and at least one Child ID required' });
       }
 
+      // 1. Fetch parent to verify
+      const parentRes = await pool.query('SELECT ticket_number, metadata FROM incidents WHERE id = $1', [parentId]);
+      if (parentRes.rows.length === 0) return res.status(404).json({ error: 'Parent incident not found' });
+      
+      const parent = parentRes.rows[0];
+      const metadata = parent.metadata || {};
+      metadata.merged_children = [...(metadata.merged_children || []), ...childIds];
+
+      // 2. Update parent metadata
+      await pool.query('UPDATE incidents SET metadata = $1 WHERE id = $2', [JSON.stringify(metadata), parentId]);
+
+      // 3. Mark children as merged and close them
+      await pool.query(
+        "UPDATE incidents SET status = 'closed', closure_comment = $1, metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{merged_into}', $2) WHERE id = ANY($3)",
+        [`Merged into parent ticket ${parent.ticket_number}`, JSON.stringify(parentId), childIds]
+      );
+
       await auditService.logAction(
-        'IMPORT_INCIDENTS',
-        undefined,
-        undefined,
-        `Imported ${results.length} incidents from CSV (Skipped ${skipped} duplicates)`,
+        'MERGE_INCIDENTS',
+        parentId,
+        parent.ticket_number,
+        `Merged ${childIds.length} child incidents into this ticket`,
         req.headers['x-user-id'] as string
       );
 
-      res.json({ success: true, count: results.length, skipped, tickets: results });
+      // Emit real-time update
+      SocketService.emit('incidents_updated', { type: 'MERGED' });
+
+      res.json({ success: true });
     } catch (err) {
       next(err);
     }

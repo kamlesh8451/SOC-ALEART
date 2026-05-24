@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { 
   Shield, Clock, Server, AlertCircle, FileUp, CheckCircle2, 
   ArrowRight, ExternalLink, Zap, History, MessageSquare, HardDrive,
-  Link as LinkIcon, Mail, Download, Edit2, AlertTriangle, Activity, ShieldAlert
+  Link as LinkIcon, Mail, Download, Edit2, AlertTriangle, Activity, ShieldAlert,
+  Users
 } from "lucide-react";
 import { Incident } from "../types";
 import { incidentService } from "../services/incidentService";
@@ -18,9 +19,11 @@ import { adminService } from "../services/adminService";
 import { VisualLinkAnalysis } from "./VisualLinkAnalysis";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { apiJson } from "../services/apiClient";
+import { useSocket } from "@/lib/useSocket";
+import { useAuth } from "@/lib/AuthContext";
 
 export function IncidentDetailView({ 
   incident, 
@@ -33,6 +36,9 @@ export function IncidentDetailView({
   onSelectIncident: (inc: Incident) => void,
   role?: string
 }) {
+  const { user: currentUser } = useAuth();
+  const socket = useSocket();
+  const [viewers, setViewers] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [escalating, setEscalating] = useState(false);
@@ -42,6 +48,26 @@ export function IncidentDetailView({
   const [relatedIncidents, setRelatedIncidents] = useState<Incident[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [featureFlags, setFeatureFlags] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!socket || !currentUser) return;
+
+    socket.emit('view_incident', { 
+      incidentId: incident.id, 
+      user: { id: currentUser.id, name: currentUser.name } 
+    });
+
+    socket.on('incident_viewers_updated', (data) => {
+      if (data.incidentId === incident.id) {
+        setViewers(data.viewers.filter((v: any) => v.id !== currentUser.id));
+      }
+    });
+
+    return () => {
+      socket.emit('stop_viewing', incident.id);
+      socket.off('incident_viewers_updated');
+    };
+  }, [socket, incident.id, currentUser]);
 
   useEffect(() => {
     const fetchRelated = async () => {
@@ -205,16 +231,43 @@ export function IncidentDetailView({
             </Badge>
           </div>
         </div>
-        <Button 
-          variant="outline"
-          size="sm"
-          onClick={handleExportReport}
-          disabled={exporting}
-          className="border-primary/20 text-primary hover:bg-primary/10 gap-2 uppercase font-bold text-[10px]"
-        >
-          <Download size={14} />
-          {exporting ? "Generating..." : "Export Report"}
-        </Button>
+        <div className="flex items-center gap-3">
+          <AnimatePresence>
+            {viewers.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-full"
+              >
+                <div className="flex -space-x-2 mr-1">
+                  {viewers.map((v, i) => (
+                    <div 
+                      key={v.id} 
+                      className="w-6 h-6 rounded-full bg-cyan-600 border-2 border-[#050505] flex items-center justify-center text-[8px] font-black text-white uppercase"
+                      title={`${v.name} is viewing this ticket`}
+                    >
+                      {v.name.substring(0, 1)}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                   <Eye size={10} className="animate-pulse" /> {viewers.length} Active Operative{viewers.length > 1 ? 's' : ''}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={handleExportReport}
+            disabled={exporting}
+            className="border-primary/20 text-primary hover:bg-primary/10 gap-2 uppercase font-bold text-[10px]"
+          >
+            <Download size={14} />
+            {exporting ? "Generating..." : "Export Report"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -472,27 +525,36 @@ export function IncidentDetailView({
               )}
 
               <div className="space-y-3 pt-2">
-                <Label htmlFor="rootCause" className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Root Cause Analysis</Label>
+                <Label htmlFor="rootCause" className="text-[10px] uppercase font-bold text-muted-foreground mr-1 flex items-center gap-2">
+                   <Shield className="w-3 h-3" /> Root Cause Analysis
+                </Label>
                 <textarea 
                   id="rootCause"
                   value={rootCause || incident.rootCause || ""}
                   onChange={(e) => setRootCause(e.target.value)}
-                  placeholder="What was the origin of this alert?"
-                  className="flex min-h-[60px] w-full rounded-md border border-border bg-secondary px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
+                  placeholder="Identify the initial attack vector..."
+                  className="flex min-h-[60px] w-full rounded-lg border border-border bg-background px-4 py-3 text-xs font-mono focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 text-foreground transition-all"
                   disabled={incident.status === 'closed'}
                 />
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="closureComment" className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Closure Summary</Label>
-                <textarea 
-                  id="closureComment"
-                  value={closureComment || incident.closureComment || ""}
-                  onChange={(e) => setClosureComment(e.target.value)}
-                  placeholder="Detail the resolution actions taken..."
-                  className="flex min-h-[80px] w-full rounded-md border border-border bg-secondary px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
-                  disabled={incident.status === 'closed'}
-                />
+                <Label htmlFor="closureComment" className="text-[10px] uppercase font-bold text-muted-foreground mr-1 flex items-center gap-2">
+                   <FileText className="w-3 h-3" /> Tactical Closure Narrative
+                </Label>
+                <div className="relative group">
+                  <textarea 
+                    id="closureComment"
+                    value={closureComment || incident.closureComment || ""}
+                    onChange={(e) => setClosureComment(e.target.value)}
+                    placeholder="Detail the technical remediation steps taken..."
+                    className="flex min-h-[120px] w-full rounded-lg border border-border bg-background px-4 py-3 text-xs font-mono focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 text-foreground transition-all"
+                    disabled={incident.status === 'closed'}
+                  />
+                  <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <Badge variant="secondary" className="bg-black/40 text-[7px] border-border/50 uppercase font-black tracking-tighter">MD_SUPPORTED</Badge>
+                  </div>
+                </div>
               </div>
 
               <Button 

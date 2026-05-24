@@ -138,7 +138,8 @@ CREATE TABLE IF NOT EXISTS mailbox_settings (
     username TEXT NOT NULL,
     password TEXT NOT NULL,
     poll_interval INTEGER DEFAULT 60,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    spam_filters JSONB DEFAULT '[]'::jsonb
 );
 
 CREATE TABLE IF NOT EXISTS feature_flags (
@@ -239,6 +240,10 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='incidents' AND column_name='updated_at') THEN
         ALTER TABLE incidents ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='mailbox_settings' AND column_name='spam_filters') THEN
+        ALTER TABLE mailbox_settings ADD COLUMN spam_filters JSONB DEFAULT '[]'::jsonb;
     END IF;
 END $$;
 

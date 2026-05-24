@@ -22,6 +22,7 @@ import { AdminSettings } from './AdminSettings';
 import { IncidentsListView } from './IncidentsListView';
 import { ThreatMap } from './ThreatMap';
 import { ReportsHubView } from './ReportsHubView';
+import { GlobalSearch } from './GlobalSearch';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -338,10 +339,7 @@ export const DashboardView: React.FC = () => {
               <p className="text-cyan-500/40 text-[9px] font-mono uppercase tracking-[0.25em] mt-2 max-w-xl leading-relaxed">Centralized Security Orchestration Hub v4.2.1-STABLE</p>
             </div>
             <div className="flex items-center gap-4">
-               <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500/40" />
-                  <input className="bg-cyan-500/5 border border-cyan-500/10 rounded-full pl-10 pr-4 py-2 text-xs focus:border-cyan-500/40 transition-all outline-none w-64 text-white placeholder:text-cyan-500/20" placeholder="QUERY THREAT DATABASE..." />
-               </div>
+               <GlobalSearch onSelectIncident={handleViewIncident} />
                <Button 
                  size="icon" 
                  variant="ghost" 

@@ -5,7 +5,7 @@ import {
   Ticket, Search, Filter, ArrowUpDown, 
   MoreHorizontal, Eye, Edit2, Trash2,
   AlertTriangle, Clock, CheckCircle, Shield, ChevronLeft,
-  Download, Upload
+  Download, Upload, GitMerge
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,18 +62,44 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
   };
 
   const handleBulkDelete = async () => {
-    if (!isAdmin || selectedIds.length === 0) return;
-    if (!confirm(`WARNIING: Permanently purge ${selectedIds.length} records from registry?`)) return;
-    try {
-      toast.loading(`Sanitizing registry...`);
-      await incidentService.bulkDelete(selectedIds);
-      toast.dismiss();
-      toast.success(`${selectedIds.length} records purged`);
-      setSelectedIds([]);
-    } catch (err) {
-      toast.dismiss();
-      toast.error("Sanitization pipeline failure");
-    }
+   if (!isAdmin || selectedIds.length === 0) return;
+   if (!confirm(`WARNIING: Permanently purge ${selectedIds.length} records from registry?`)) return;
+   try {
+     toast.loading(`Sanitizing registry...`);
+     await incidentService.bulkDelete(selectedIds);
+     toast.dismiss();
+     toast.success(`${selectedIds.length} records purged`);
+     setSelectedIds([]);
+   } catch (err) {
+     toast.dismiss();
+     toast.error("Sanitization pipeline failure");
+   }
+  };
+
+  const [mergingParentId, setMergingParentId] = useState<string | null>(null);
+
+  const handleMerge = async () => {
+   if (selectedIds.length < 2) return toast.error("Select at least 2 incidents to merge");
+
+   toast.info("Select the PRIMARY (Parent) ticket from your selection to merge others into it", {
+     duration: 5000
+   });
+   setMergingParentId('SELECTING');
+  };
+
+  const finalizeMerge = async (parentId: string) => {
+   const childIds = selectedIds.filter(id => id !== parentId);
+   try {
+     toast.loading("Consolidating investigation threads...");
+     await incidentService.merge(parentId, childIds);
+     toast.dismiss();
+     toast.success(`Successfully merged ${childIds.length} incidents into ${incidents.find(i => i.id === parentId)?.ticketNumber}`);
+     setSelectedIds([]);
+     setMergingParentId(null);
+   } catch (err) {
+     toast.dismiss();
+     toast.error("Merge operation aborted: System conflict");
+   }
   };
 
   const toggleSelectAll = () => {
@@ -236,6 +262,22 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
               </span>
             </div>
             <div className="flex items-center gap-3">
+               {mergingParentId === 'SELECTING' ? (
+                 <Button 
+                   onClick={() => setMergingParentId(null)}
+                   className="bg-amber-500 hover:bg-amber-600 text-black font-bold uppercase tracking-widest text-[9px] h-8 px-4 animate-pulse"
+                 >
+                   Cancel Merge
+                 </Button>
+               ) : (
+                 <Button 
+                   onClick={handleMerge}
+                   className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4"
+                 >
+                   <GitMerge className="w-3 h-3 mr-2" />
+                   Merge
+                 </Button>
+               )}
                <Button 
                  onClick={handleBulkClose}
                  className="bg-green-500 hover:bg-green-600 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4"
@@ -310,10 +352,12 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
                     onView={() => setSelectedIncidentId(inc.id)} 
                     isAdmin={isAdmin}
                     isSelected={selectedIds.includes(inc.id)}
+                    isMerging={mergingParentId === 'SELECTING'}
                     onSelect={(checked) => {
                       if (checked) setSelectedIds(prev => [...prev, inc.id]);
                       else setSelectedIds(prev => prev.filter(id => id !== inc.id));
                     }}
+                    onFinalizeMerge={() => finalizeMerge(inc.id)}
                   />
                 ))}
               </tbody>
@@ -327,12 +371,14 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
   );
 };
 
-const IncidentRow = ({ inc, onView, isAdmin, isSelected, onSelect }: { 
+const IncidentRow = ({ inc, onView, isAdmin, isSelected, isMerging, onSelect, onFinalizeMerge }: { 
   inc: Incident, 
   onView: () => void, 
   isAdmin?: boolean,
   isSelected?: boolean,
-  onSelect?: (checked: boolean) => void 
+  isMerging?: boolean,
+  onSelect?: (checked: boolean) => void,
+  onFinalizeMerge?: () => void
 }) => {
   const isBreached = Date.now() > inc.slaDeadline && inc.status !== 'closed';
 
@@ -405,32 +451,44 @@ const IncidentRow = ({ inc, onView, isAdmin, isSelected, onSelect }: {
         </div>
       </td>
       <td className="p-5 text-right">
-         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"
-              onClick={async (e) => {
-                e.stopPropagation();
-                try {
-                  toast.loading("Generating secure report...");
-                  await incidentService.exportOne(inc.id, inc.ticketNumber);
-                  toast.dismiss();
-                  toast.success("Report export complete");
-                } catch (err) {
-                  toast.dismiss();
-                  toast.error("Export failed");
-                }
-              }}
-              title="Export Specific Report"
-            >
-              <Download size={14} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"><Eye size={14} /></Button>
+         <div className="flex gap-1 justify-end">
+            {isMerging && isSelected ? (
+              <Button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFinalizeMerge?.();
+                }}
+                className="h-8 bg-cyan-500 hover:bg-cyan-600 text-white font-bold uppercase text-[9px]"
+              >
+                Select as Parent
+              </Button>
+            ) : (
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      toast.loading("Generating secure report...");
+                      await incidentService.exportOne(inc.id, inc.ticketNumber);
+                      toast.dismiss();
+                      toast.success("Report export complete");
+                    } catch (err) {
+                      toast.dismiss();
+                      toast.error("Export failed");
+                    }
+                  }}
+                  title="Export Specific Report"
+                >
+                  <Download size={14} />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"><Eye size={14} /></Button>
+              </div>
+            )}
          </div>
       </td>
     </tr>
   );
 };
-
-

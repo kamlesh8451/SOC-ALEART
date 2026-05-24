@@ -100,5 +100,30 @@ export const authController = {
 
   async me(req: any, res: Response) {
     res.json(req.user);
+  },
+
+  async getSessions(req: any, res: Response, next: NextFunction) {
+    try {
+      const result = await pool.query(`
+        SELECT s.id, s.token, s.created_at, s.expires_at, s.ip_address, s.user_agent,
+               u.email, u.name, u.role
+        FROM sessions s
+        JOIN users u ON s.user_id = u.id
+        ORDER BY s.created_at DESC
+      `);
+      res.json(result.rows);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async revokeSession(req: any, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      await pool.query('DELETE FROM sessions WHERE id = $1', [id]);
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
   }
 };

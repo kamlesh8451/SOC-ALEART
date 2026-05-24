@@ -20,6 +20,22 @@ else
     echo "PM2 $(pm2 -v) is already installed."
 fi
 
+# Ensure Redis is installed and running (Required for Automation Engine)
+if ! command -v redis-server &> /dev/null; then
+    echo "Redis not found. Installing..."
+    sudo apt-get update
+    sudo apt-get install -y redis-server
+fi
+sudo systemctl enable redis-server --now
+
+# Install PM2 Log Rotate to prevent disk exhaustion
+if ! sudo pm2 list | grep -q "pm2-logrotate"; then
+    echo "Installing PM2 Log Rotate..."
+    sudo pm2 install pm2-logrotate
+    sudo pm2 set pm2-logrotate:max_size 10M
+    sudo pm2 set pm2-logrotate:retain 10
+fi
+
 echo "[2/6] Syncing Workspace Dependencies & Optimizing Memory..."
 # Ensure Swap Space for small instances (OOM prevention during Vite build)
 if [ -f /proc/meminfo ]; then

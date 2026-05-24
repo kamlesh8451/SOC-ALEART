@@ -168,5 +168,16 @@ export const adminService = {
     }
     
     return null;
+  },
+
+  // Session Management
+  async getSessions() {
+    return apiJson<any[]>('/api/auth/sessions');
+  },
+
+  async revokeSession(id: string) {
+    return apiJson(`/api/auth/sessions/${id}`, {
+      method: 'DELETE'
+    });
   }
 };

@@ -214,5 +214,17 @@ export const incidentService = {
   // Fetch current incident registry
   async getIncidents() {
     return apiJson<Incident[]>("/api/incidents");
+  },
+
+  async search(query: string) {
+    return apiJson<Incident[]>(`/api/incidents/search?q=${encodeURIComponent(query)}`);
+  },
+
+  async merge(parentId: string, childIds: string[]) {
+    return apiJson("/api/incidents/merge", {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentId, childIds }),
+    });
   }
 };

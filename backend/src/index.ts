@@ -15,6 +15,7 @@ import ticketRoutes from './routes/ticketRoutes';
 import mailRoutes from './routes/mailRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import reportRoutes from './routes/reportRoutes';
+import slaRoutes from './routes/slaRoutes';
 import { errorHandler, authenticate } from './middleware/auth';
 import { slaService } from './services/slaService';
 import { EmailIngestionService } from './services/EmailIngestionService';
@@ -91,6 +92,7 @@ app.use('/api/tickets', authenticate, ticketRoutes);
 app.use('/api/mail', authenticate, mailRoutes);
 app.use('/api/settings', authenticate, settingsRoutes);
 app.use('/api/reports', authenticate, reportRoutes);
+app.use('/api/sla', authenticate, slaRoutes);
 
 app.post('/api/notifications/simulate-email', (req, res) => {
   try {

@@ -8,6 +8,8 @@ router.get('/export', incidentController.exportAll);
 router.post('/import', incidentController.importCsv);
 router.get('/stats', incidentController.getStats);
 router.get('/analytics', incidentController.getAnalytics);
+router.get('/search', incidentController.search);
+router.post('/merge', incidentController.merge);
 router.get('/:id', incidentController.getOne);
 router.post('/:id/syric', incidentController.startSyric);
 router.post('/', incidentController.create);

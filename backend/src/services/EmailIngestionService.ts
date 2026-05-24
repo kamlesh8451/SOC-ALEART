@@ -94,7 +94,7 @@ export class EmailIngestionService {
             });
             
             if (message) {
-              const result = await this.handleEmail(message);
+              const result = await this.handleEmail(message, settings);
               // Mark as seen immediately after processing attempt
               await client.messageFlagsAdd(uid, ['\\Seen']);
 
@@ -116,7 +116,7 @@ export class EmailIngestionService {
     }
   }
 
-  private static async handleEmail(message: any): Promise<'CREATED' | 'APPENDED' | null> {
+  private static async handleEmail(message: any, settings: any): Promise<'CREATED' | 'APPENDED' | null> {
     const parsed = await simpleParser(message.source);
     const subject = parsed.subject || 'No Subject';
     const sender = parsed.from?.text || 'unknown@sender.com';
@@ -135,9 +135,23 @@ export class EmailIngestionService {
       return null;
     }
 
+    // 2. Spam/Noise Filtering
+    if (this.isSpam(subject, sender, settings.spam_filters)) {
+      console.log(`[MAIL] FILTERED (Spam/Noise): ${subject} from ${sender}`);
+      await pool.query(
+        'INSERT INTO email_logs (message_id, sender, subject, processed_status) VALUES ($1, $2, $3, $4)',
+        [messageId, sender, subject, 'FILTERED']
+      );
+      await pool.query(
+        'INSERT INTO email_message_registry (message_id, subject_hash, sender) VALUES ($1, $2, $3)',
+        [messageId, subjectHash, sender]
+      );
+      return null;
+    }
+
     console.log(`[MAIL] Processing email: ${subject} from ${sender}`);
 
-    // 2. Thread Management
+    // 3. Thread Management
     const inReplyTo = parsed.inReplyTo;
     const references = Array.isArray(parsed.references) ? parsed.references : (parsed.references ? [parsed.references] : []);
     
@@ -410,6 +424,25 @@ export class EmailIngestionService {
     if (medium.some(k => text.includes(k))) return 'medium';
 
     return 'low';
+  }
+
+  private static isSpam(subject: string, sender: string, filters: any[]): boolean {
+    if (!filters || !Array.isArray(filters)) return false;
+    
+    const text = `${subject} ${sender}`.toLowerCase();
+    return filters.some(filter => {
+      const pattern = filter.toLowerCase();
+      try {
+        // Support simple keyword matching
+        if (text.includes(pattern)) return true;
+        // Support regex matching if the filter looks like one
+        if (pattern.startsWith('/') && pattern.endsWith('/')) {
+          const regex = new RegExp(pattern.slice(1, -1), 'i');
+          return regex.test(text);
+        }
+      } catch (e) {}
+      return false;
+    });
   }
 
   private static slaHoursForSeverity(severity: string): number {
