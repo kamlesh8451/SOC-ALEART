@@ -127,11 +127,11 @@ export const DashboardView: React.FC = () => {
       case 'dashboard':
       default:
         return (
-          <div className="space-y-10">
-            {/* Tier 1: Critical Operational KPIs */}
+          <div className="space-y-12">
+            {/* Tier 1: Core Operational Intelligence */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {isEnabled('widget_active_threats') && (
-                <KPICard title="ACTIVE THREATS" value={stats?.activeThreats || 0} subValue={`${stats?.open || 0} New / ${stats?.investigating || 0} Active`} icon={<AlertTriangle className="text-red-500" />} color="red" />
+                <KPICard title="ACTIVE THREATS" value={stats?.activeThreats} subValue={`${stats?.open || 0} New / ${stats?.investigating || 0} Active`} icon={<AlertTriangle className="text-red-500" />} color="red" />
               )}
               {isEnabled('widget_mtta') && (
                 <KPICard title="AVG ACK (MTTA)" value={`${analytics?.mtta || 0}m`} trend="Target < 15m" icon={<Activity className="text-cyan-500" />} color="cyan" />
@@ -140,60 +140,41 @@ export const DashboardView: React.FC = () => {
                 <KPICard title="AVG RESOLVE (MTTR)" value={`${analytics?.mttr || 0}h`} trend="Target < 24h" icon={<History className="text-green-500" />} color="green" />
               )}
               {isEnabled('widget_closed_total') && (
-                <KPICard title="All CLOSED TICKETS" value={stats?.closed || 0} trend="Total Life Cycle" icon={<ShieldCheck className="text-purple-500" />} color="purple" />
+                <KPICard title="All CLOSED TICKETS" value={stats?.closed} trend="Total Life Cycle" icon={<ShieldCheck className="text-purple-500" />} color="purple" />
               )}
             </div>
 
-            {/* Tier 2: Granular Severity Matrices (Side-by-Side) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-               {/* Live Exposure Matrix (Open) */}
-               {isEnabled('widget_open_matrix') && (
-                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                   <Card className="bg-black/60 border-red-500/20 backdrop-blur-2xl border-t-red-500/50 border-t-2 overflow-hidden shadow-[0_0_50px_rgba(239,68,68,0.05)] h-full">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                         <ShieldAlert className="w-20 h-20 text-red-500" />
-                      </div>
-                      <CardHeader className="pb-2 relative">
-                         <CardTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-red-500 flex items-center gap-3">
-                            <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                            Live Exposure Matrix (Open)
-                         </CardTitle>
-                         <p className="text-[9px] text-muted-foreground uppercase font-mono mt-1">Currently active threat landscape</p>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-2 gap-4 p-6 relative">
-                         <MiniStat label="Critical" value={stats?.criticalOpen} show={isEnabled('widget_critical_open')} color="text-red-500" bgColor="bg-red-500/5" />
-                         <MiniStat label="High" value={stats?.highOpen} show={isEnabled('widget_high_open')} color="text-orange-500" bgColor="bg-orange-500/5" />
-                         <MiniStat label="Medium" value={stats?.mediumOpen} show={isEnabled('widget_medium_open')} color="text-yellow-500" bgColor="bg-yellow-500/5" />
-                         <MiniStat label="Low" value={stats?.lowOpen} show={isEnabled('widget_low_open')} color="text-blue-500" bgColor="bg-blue-500/5" />
-                      </CardContent>
-                   </Card>
-                 </motion.div>
-               )}
+            {/* Tier 2: Live Exposure Matrix (Open) - Spread Out */}
+            {isEnabled('widget_open_matrix') && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 px-1">
+                   <div className="w-1 h-4 bg-red-500 rounded-full" />
+                   <h3 className="text-xs font-black uppercase tracking-[0.3em] text-red-500/80">Live Exposure Matrix (Open)</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                   <MetricCard label="Critical Open" value={stats?.criticalOpen} show={isEnabled('widget_critical_open')} color="red" icon={<Zap className="w-3 h-3" />} />
+                   <MetricCard label="High Open" value={stats?.highOpen} show={isEnabled('widget_high_open')} color="orange" icon={<ShieldAlert className="w-3 h-3" />} />
+                   <MetricCard label="Medium Open" value={stats?.mediumOpen} show={isEnabled('widget_medium_open')} color="yellow" icon={<Activity className="w-3 h-3" />} />
+                   <MetricCard label="Low Open" value={stats?.lowOpen} show={isEnabled('widget_low_open')} color="blue" icon={<Shield className="w-3 h-3" />} />
+                </div>
+              </div>
+            )}
 
-               {/* Neutralization History (Closed) */}
-               {isEnabled('widget_closed_matrix') && (
-                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                   <Card className="bg-black/60 border-green-500/20 backdrop-blur-2xl border-t-green-500/50 border-t-2 overflow-hidden shadow-[0_0_50px_rgba(34,197,94,0.05)] h-full">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                         <ShieldCheck className="w-20 h-20 text-green-500" />
-                      </div>
-                      <CardHeader className="pb-2 relative">
-                         <CardTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-green-500 flex items-center gap-3">
-                            <CheckCircle className="w-4 h-4" />
-                            Neutralization History (Closed)
-                         </CardTitle>
-                         <p className="text-[9px] text-muted-foreground uppercase font-mono mt-1">Total threats mitigated and archived</p>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-2 gap-4 p-6 relative">
-                         <MiniStat label="Critical" value={stats?.criticalClosed} show={isEnabled('widget_critical_closed')} color="text-red-500" bgColor="bg-red-500/5" />
-                         <MiniStat label="High" value={stats?.highClosed} show={isEnabled('widget_high_closed')} color="text-orange-500" bgColor="bg-orange-500/5" />
-                         <MiniStat label="Medium" value={stats?.mediumClosed} show={isEnabled('widget_medium_closed')} color="text-yellow-500" bgColor="bg-yellow-500/5" />
-                         <MiniStat label="Low" value={stats?.lowClosed} show={isEnabled('widget_low_closed')} color="text-blue-500" bgColor="bg-blue-500/5" />
-                      </CardContent>
-                   </Card>
-                 </motion.div>
-               )}
-            </div>
+            {/* Tier 3: Neutralization History (Closed) - Spread Out */}
+            {isEnabled('widget_closed_matrix') && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 px-1">
+                   <div className="w-1 h-4 bg-green-500 rounded-full" />
+                   <h3 className="text-xs font-black uppercase tracking-[0.3em] text-green-500/80">Neutralization History (Closed)</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                   <MetricCard label="Critical Closed" value={stats?.criticalClosed} show={isEnabled('widget_critical_closed')} color="red" icon={<CheckCircle className="w-3 h-3" />} />
+                   <MetricCard label="High Closed" value={stats?.highClosed} show={isEnabled('widget_high_closed')} color="orange" icon={<CheckCircle className="w-3 h-3" />} />
+                   <MetricCard label="Medium Closed" value={stats?.mediumClosed} show={isEnabled('widget_medium_closed')} color="yellow" icon={<CheckCircle className="w-3 h-3" />} />
+                   <MetricCard label="Low Closed" value={stats?.lowClosed} show={isEnabled('widget_low_closed')} color="blue" icon={<CheckCircle className="w-3 h-3" />} />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-2 bg-black/40 border-cyan-500/10 backdrop-blur-xl">
@@ -425,7 +406,7 @@ const KPICard = ({ title, value, subValue, trend, icon, color }: any) => (
       <div className="p-2 bg-white/5 rounded-lg group-hover:scale-110 transition-transform">{icon}</div>
     </CardHeader>
     <CardContent>
-      <div className="text-3xl font-black text-white tracking-tighter">{value}</div>
+      <div className="text-3xl font-black text-white tracking-tighter">{value || 0}</div>
       {subValue && <p className="text-[9px] font-mono text-cyan-500/50 uppercase mt-1 tracking-tighter">{subValue}</p>}
       {trend && (
         <p className={cn(
@@ -439,12 +420,36 @@ const KPICard = ({ title, value, subValue, trend, icon, color }: any) => (
   </Card>
 );
 
-const MiniStat = ({ label, value, color, show }: { label: string, value: number, color: string, show: boolean }) => {
+const MetricCard = ({ label, value, icon, color, show }: any) => {
   if (!show) return null;
+  
+  const colorMap: Record<string, string> = {
+    red: 'text-red-500 border-red-500/20 bg-red-500/5',
+    orange: 'text-orange-500 border-orange-500/20 bg-orange-500/5',
+    yellow: 'text-yellow-500 border-yellow-500/20 bg-yellow-500/5',
+    blue: 'text-blue-500 border-blue-500/20 bg-blue-500/5',
+    green: 'text-green-500 border-green-500/20 bg-green-500/5',
+    purple: 'text-purple-500 border-purple-500/20 bg-purple-500/5',
+    cyan: 'text-cyan-500 border-cyan-500/20 bg-cyan-500/5'
+  };
+
+  const activeColor = colorMap[color] || colorMap.blue;
+
   return (
-    <div className="bg-white/5 p-3 rounded-lg border border-white/5 text-center group hover:bg-white/10 transition-all">
-       <p className={cn("text-[9px] font-black uppercase tracking-widest mb-1", color)}>{label}</p>
-       <p className="text-xl font-bold text-white tracking-tighter">{value || 0}</p>
-    </div>
+    <Card className={cn("bg-black/40 border backdrop-blur-xl group hover:scale-[1.02] transition-all duration-300", activeColor.split(' ')[1])}>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className={cn("p-1.5 rounded-md", activeColor.split(' ')[2])}>
+            {icon}
+          </div>
+          <Badge variant="outline" className={cn("text-[7px] font-black uppercase tracking-tighter border-none", activeColor.split(' ')[0])}>LIVE_DATA</Badge>
+        </div>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{label}</p>
+        <div className="flex items-baseline gap-2">
+           <span className={cn("text-3xl font-black tracking-tighter", activeColor.split(' ')[0])}>{value || 0}</span>
+           <span className="text-[8px] font-mono text-muted-foreground/40">UNITS</span>
+        </div>
+      </CardContent>
+    </Card>
   );
 };

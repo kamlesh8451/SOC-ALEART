@@ -450,6 +450,7 @@ export const incidentController = {
 
   async getStats(_req: Request, res: Response, next: NextFunction) {
     try {
+      console.log('[DEBUG] Fetching dashboard statistics...');
       const statsRes = await pool.query(`
         SELECT 
           COUNT(*) FILTER (WHERE status ILIKE 'open') as open_count,
@@ -473,19 +474,21 @@ export const incidentController = {
 
       const velocityRes = await pool.query(`
         SELECT 
-          to_char(date_trunc('day', to_timestamp(detection_time / 1000)), 'Dy') as name,
+          to_char(date_trunc('day', to_timestamp(detection_time / 1000.0)), 'Dy') as name,
           COUNT(*) FILTER (WHERE status NOT ILIKE 'closed') as open,
           COUNT(*) FILTER (WHERE status ILIKE 'closed') as closed
         FROM incidents
         WHERE detection_time > (extract(epoch from now()) * 1000 - 7 * 24 * 60 * 60 * 1000)
-        GROUP BY date_trunc('day', to_timestamp(detection_time / 1000)), name
-        ORDER BY date_trunc('day', to_timestamp(detection_time / 1000)) ASC
+        GROUP BY date_trunc('day', to_timestamp(detection_time / 1000.0)), name
+        ORDER BY date_trunc('day', to_timestamp(detection_time / 1000.0)) ASC
       `);
 
       const stats = statsRes.rows[0] || {};
+      console.log('[DEBUG] Stats result:', stats);
+      console.log('[DEBUG] Velocity records:', velocityRes.rows.length);
       
       res.json({
-        version: '5.1.0-RESILIENT-METRICS',
+        version: '5.2.0-DEBUG-METRICS',
         open: parseInt(stats.open_count || '0'),
         investigating: parseInt(stats.investigating_count || '0'),
         closed: parseInt(stats.closed_count || '0'),
@@ -513,6 +516,7 @@ export const incidentController = {
         }))
       });
     } catch (err) {
+      console.error('[DEBUG] Stats fetch failed:', err);
       next(err);
     }
   },
