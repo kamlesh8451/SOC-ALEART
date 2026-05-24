@@ -410,7 +410,7 @@ export const incidentController = {
           AVG(acknowledged_at - detection_time) / 1000 / 60 as avg_mtta_minutes,
           AVG(resolved_at - acknowledged_at) / 1000 / 60 / 60 as avg_mttr_hours
         FROM incidents
-        WHERE acknowledged_at IS NOT NULL
+        WHERE acknowledged_at IS NOT NULL AND TRIM(status) NOT ILIKE 'open'
       `);
 
       const stats = result.rows[0];
@@ -450,24 +450,24 @@ export const incidentController = {
 
   async getStats(_req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('[DEBUG] Fetching dashboard statistics...');
+      console.log('[DEBUG] Tactical Command telemetry sync started...');
       const statsRes = await pool.query(`
         SELECT 
-          COUNT(*) FILTER (WHERE status ILIKE 'open') as open_count,
-          COUNT(*) FILTER (WHERE status ILIKE 'investigating') as investigating_count,
-          COUNT(*) FILTER (WHERE status ILIKE 'closed') as closed_count,
+          COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'open') as open_count,
+          COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'investigating') as investigating_count,
+          COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'closed') as closed_count,
           
-          COUNT(*) FILTER (WHERE severity ILIKE 'critical' AND status NOT ILIKE 'closed') as critical_open,
-          COUNT(*) FILTER (WHERE severity ILIKE 'high' AND status NOT ILIKE 'closed') as high_open,
-          COUNT(*) FILTER (WHERE (severity ILIKE 'medium' OR severity ILIKE 'TEST') AND status NOT ILIKE 'closed') as medium_open,
-          COUNT(*) FILTER (WHERE severity ILIKE 'low' AND status NOT ILIKE 'closed') as low_open,
+          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'critical' AND TRIM(status) NOT ILIKE 'closed') as critical_open,
+          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'high' AND TRIM(status) NOT ILIKE 'closed') as high_open,
+          COUNT(*) FILTER (WHERE (TRIM(severity) ILIKE 'medium' OR TRIM(severity) ILIKE 'TEST') AND TRIM(status) NOT ILIKE 'closed') as medium_open,
+          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'low' AND TRIM(status) NOT ILIKE 'closed') as low_open,
           
-          COUNT(*) FILTER (WHERE severity ILIKE 'critical' AND status ILIKE 'closed') as critical_closed,
-          COUNT(*) FILTER (WHERE severity ILIKE 'high' AND status ILIKE 'closed') as high_closed,
-          COUNT(*) FILTER (WHERE (severity ILIKE 'medium' OR severity ILIKE 'TEST') AND status ILIKE 'closed') as medium_closed,
-          COUNT(*) FILTER (WHERE severity ILIKE 'low' AND status ILIKE 'closed') as low_closed,
+          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'critical' AND TRIM(status) ILIKE 'closed') as critical_closed,
+          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'high' AND TRIM(status) ILIKE 'closed') as high_closed,
+          COUNT(*) FILTER (WHERE (TRIM(severity) ILIKE 'medium' OR TRIM(severity) ILIKE 'TEST') AND TRIM(status) ILIKE 'closed') as medium_closed,
+          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'low' AND TRIM(status) ILIKE 'closed') as low_closed,
           
-          COUNT(*) FILTER (WHERE status NOT ILIKE 'closed') as active_threats,
+          COUNT(*) FILTER (WHERE TRIM(status) NOT ILIKE 'closed') as active_threats,
           COUNT(*) as total_count
         FROM incidents
       `);
@@ -475,8 +475,8 @@ export const incidentController = {
       const velocityRes = await pool.query(`
         SELECT 
           to_char(date_trunc('day', to_timestamp(detection_time / 1000.0)), 'Dy') as name,
-          COUNT(*) FILTER (WHERE status NOT ILIKE 'closed') as open,
-          COUNT(*) FILTER (WHERE status ILIKE 'closed') as closed
+          COUNT(*) FILTER (WHERE TRIM(status) NOT ILIKE 'closed') as open,
+          COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'closed') as closed
         FROM incidents
         WHERE detection_time > (extract(epoch from now()) * 1000 - 7 * 24 * 60 * 60 * 1000)
         GROUP BY date_trunc('day', to_timestamp(detection_time / 1000.0)), name
@@ -484,11 +484,10 @@ export const incidentController = {
       `);
 
       const stats = statsRes.rows[0] || {};
-      console.log('[DEBUG] Stats result:', stats);
-      console.log('[DEBUG] Velocity records:', velocityRes.rows.length);
+      console.log('[DEBUG] Raw Aggregated Stats:', JSON.stringify(stats));
       
-      res.json({
-        version: '5.2.0-DEBUG-METRICS',
+      const payload = {
+        version: '5.3.0-ROBUST-AGGREGATION',
         open: parseInt(stats.open_count || '0'),
         investigating: parseInt(stats.investigating_count || '0'),
         closed: parseInt(stats.closed_count || '0'),
@@ -514,9 +513,12 @@ export const incidentController = {
           open: parseInt(v.open || '0'),
           closed: parseInt(v.closed || '0')
         }))
-      });
-    } catch (err) {
-      console.error('[DEBUG] Stats fetch failed:', err);
+      };
+
+      console.log('[DEBUG] Payload for Delivery:', JSON.stringify(payload));
+      res.json(payload);
+    } catch (err: any) {
+      console.error('[CRIT] Stats engine failure:', err.message);
       next(err);
     }
   },

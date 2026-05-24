@@ -63,19 +63,27 @@ export const DashboardView: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      console.log('[TELEMETRY] Initiating tactical sync...');
       const [statsData, analyticsData, incidentsData, flagsData] = await Promise.all([
         incidentService.getStats(),
         incidentService.getAnalytics(),
         incidentService.getIncidents(),
         adminService.getFeatureFlags()
       ]);
+      
+      console.log('[TELEMETRY] Stats Received:', statsData);
+      console.log('[TELEMETRY] Flags Received:', flagsData?.length);
+      
       setStats(statsData);
       setAnalytics(analyticsData);
       setRecentIncidents(incidentsData.slice(0, 5));
       setFeatureFlags(flagsData);
       setLoading(false);
-    } catch (e) {
-      console.error("Sync error", e);
+    } catch (e: any) {
+      console.error("[CRIT] Telemetry sync aborted:", e.message);
+      toast.error(`Tactical Sync Failure: ${e.message}`, {
+        description: "Check secure connection or contact HQ systems admin."
+      });
     }
   };
 
