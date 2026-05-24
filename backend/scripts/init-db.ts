@@ -153,6 +153,8 @@ INSERT INTO feature_flags (name, is_enabled, description)
 VALUES 
   ('graph_intelligence', TRUE, 'Visual link analysis of hosts, IPs, and related incidents'),
   ('widget_active_threats', TRUE, 'Show Active Threats (Open + Investigating) count on dashboard'),
+  ('widget_open_matrix', TRUE, 'Show the entire Live Exposure Matrix (Open) section'),
+  ('widget_closed_matrix', TRUE, 'Show the entire Neutralization History (Closed) section'),
   ('widget_mtta', TRUE, 'Show Mean Time to Acknowledge (MTTA) on dashboard'),
   ('widget_mttr', TRUE, 'Show Mean Time to Resolve (MTTR) on dashboard'),
   ('widget_closed_total', TRUE, 'Show total closed tickets count on dashboard'),

@@ -452,21 +452,21 @@ export const incidentController = {
     try {
       const statsRes = await pool.query(`
         SELECT 
-          COUNT(*) FILTER (WHERE status = 'open') as open_count,
-          COUNT(*) FILTER (WHERE status = 'investigating') as investigating_count,
-          COUNT(*) FILTER (WHERE status = 'closed') as closed_count,
+          COUNT(*) FILTER (WHERE status ILIKE 'open') as open_count,
+          COUNT(*) FILTER (WHERE status ILIKE 'investigating') as investigating_count,
+          COUNT(*) FILTER (WHERE status ILIKE 'closed') as closed_count,
           
-          COUNT(*) FILTER (WHERE severity = 'critical' AND status != 'closed') as critical_open,
-          COUNT(*) FILTER (WHERE severity = 'high' AND status != 'closed') as high_open,
-          COUNT(*) FILTER (WHERE (severity = 'medium' OR severity = 'TEST') AND status != 'closed') as medium_open,
-          COUNT(*) FILTER (WHERE severity = 'low' AND status != 'closed') as low_open,
+          COUNT(*) FILTER (WHERE severity ILIKE 'critical' AND status NOT ILIKE 'closed') as critical_open,
+          COUNT(*) FILTER (WHERE severity ILIKE 'high' AND status NOT ILIKE 'closed') as high_open,
+          COUNT(*) FILTER (WHERE (severity ILIKE 'medium' OR severity ILIKE 'TEST') AND status NOT ILIKE 'closed') as medium_open,
+          COUNT(*) FILTER (WHERE severity ILIKE 'low' AND status NOT ILIKE 'closed') as low_open,
           
-          COUNT(*) FILTER (WHERE severity = 'critical' AND status = 'closed') as critical_closed,
-          COUNT(*) FILTER (WHERE severity = 'high' AND status = 'closed') as high_closed,
-          COUNT(*) FILTER (WHERE (severity = 'medium' OR severity = 'TEST') AND status = 'closed') as medium_closed,
-          COUNT(*) FILTER (WHERE severity = 'low' AND status = 'closed') as low_closed,
+          COUNT(*) FILTER (WHERE severity ILIKE 'critical' AND status ILIKE 'closed') as critical_closed,
+          COUNT(*) FILTER (WHERE severity ILIKE 'high' AND status ILIKE 'closed') as high_closed,
+          COUNT(*) FILTER (WHERE (severity ILIKE 'medium' OR severity ILIKE 'TEST') AND status ILIKE 'closed') as medium_closed,
+          COUNT(*) FILTER (WHERE severity ILIKE 'low' AND status ILIKE 'closed') as low_closed,
           
-          COUNT(*) FILTER (WHERE status != 'closed') as active_threats,
+          COUNT(*) FILTER (WHERE status NOT ILIKE 'closed') as active_threats,
           COUNT(*) as total_count
         FROM incidents
       `);
@@ -474,18 +474,18 @@ export const incidentController = {
       const velocityRes = await pool.query(`
         SELECT 
           to_char(date_trunc('day', to_timestamp(detection_time / 1000)), 'Dy') as name,
-          COUNT(*) FILTER (WHERE status != 'closed') as open,
-          COUNT(*) FILTER (WHERE status = 'closed') as closed
+          COUNT(*) FILTER (WHERE status NOT ILIKE 'closed') as open,
+          COUNT(*) FILTER (WHERE status ILIKE 'closed') as closed
         FROM incidents
         WHERE detection_time > (extract(epoch from now()) * 1000 - 7 * 24 * 60 * 60 * 1000)
         GROUP BY date_trunc('day', to_timestamp(detection_time / 1000)), name
         ORDER BY date_trunc('day', to_timestamp(detection_time / 1000)) ASC
       `);
 
-      const stats = statsRes.rows[0];
+      const stats = statsRes.rows[0] || {};
       
       res.json({
-        version: '5.0.0-GRANULAR-METRICS',
+        version: '5.1.0-RESILIENT-METRICS',
         open: parseInt(stats.open_count || '0'),
         investigating: parseInt(stats.investigating_count || '0'),
         closed: parseInt(stats.closed_count || '0'),
@@ -503,10 +503,10 @@ export const incidentController = {
         lowClosed: parseInt(stats.low_closed || '0'),
         
         total: parseInt(stats.total_count || '0'),
-        compliance: stats.total_count > 0 
+        compliance: parseInt(stats.total_count || '0') > 0 
           ? Math.round((parseInt(stats.closed_count || '0') / parseInt(stats.total_count || '0')) * 100) 
           : 100,
-        velocity: velocityRes.rows.map(v => ({
+        velocity: (velocityRes.rows || []).map(v => ({
           name: v.name,
           open: parseInt(v.open || '0'),
           closed: parseInt(v.closed || '0')

@@ -127,11 +127,11 @@ export const DashboardView: React.FC = () => {
       case 'dashboard':
       default:
         return (
-          <div className="space-y-8">
-            {/* Top Level KPIs */}
+          <div className="space-y-10">
+            {/* Tier 1: Critical Operational KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {isEnabled('widget_active_threats') && (
-                <KPICard title="ACTIVE THREATS" value={stats?.activeThreats || '0'} subValue={`${stats?.open || 0} Unassigned`} icon={<AlertTriangle className="text-red-500" />} color="red" />
+                <KPICard title="ACTIVE THREATS" value={stats?.activeThreats || 0} subValue={`${stats?.open || 0} New / ${stats?.investigating || 0} Active`} icon={<AlertTriangle className="text-red-500" />} color="red" />
               )}
               {isEnabled('widget_mtta') && (
                 <KPICard title="AVG ACK (MTTA)" value={`${analytics?.mtta || 0}m`} trend="Target < 15m" icon={<Activity className="text-cyan-500" />} color="cyan" />
@@ -140,41 +140,59 @@ export const DashboardView: React.FC = () => {
                 <KPICard title="AVG RESOLVE (MTTR)" value={`${analytics?.mttr || 0}h`} trend="Target < 24h" icon={<History className="text-green-500" />} color="green" />
               )}
               {isEnabled('widget_closed_total') && (
-                <KPICard title="All CLOSED TICKETS" value={stats?.closed || '0'} trend="Total Life Cycle" icon={<ShieldCheck className="text-purple-500" />} color="purple" />
+                <KPICard title="All CLOSED TICKETS" value={stats?.closed || 0} trend="Total Life Cycle" icon={<ShieldCheck className="text-purple-500" />} color="purple" />
               )}
             </div>
 
-            {/* Granular Metrics Grids */}
+            {/* Tier 2: Granular Severity Matrices (Side-by-Side) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-               {/* Open Tickets by Severity */}
-               <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl border-l-red-500/50 border-l-2">
-                  <CardHeader className="pb-2">
-                     <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-red-500/70 flex items-center gap-2">
-                        <Zap className="w-3 h-3" /> Live Exposure Matrix (Open)
-                     </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6">
-                     <MiniStat label="Critical" value={stats?.criticalOpen} show={isEnabled('widget_critical_open')} color="text-red-500" />
-                     <MiniStat label="High" value={stats?.highOpen} show={isEnabled('widget_high_open')} color="text-orange-500" />
-                     <MiniStat label="Medium" value={stats?.mediumOpen} show={isEnabled('widget_medium_open')} color="text-yellow-500" />
-                     <MiniStat label="Low" value={stats?.lowOpen} show={isEnabled('widget_low_open')} color="text-blue-500" />
-                  </CardContent>
-               </Card>
+               {/* Live Exposure Matrix (Open) */}
+               {isEnabled('widget_open_matrix') && (
+                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                   <Card className="bg-black/60 border-red-500/20 backdrop-blur-2xl border-t-red-500/50 border-t-2 overflow-hidden shadow-[0_0_50px_rgba(239,68,68,0.05)] h-full">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                         <ShieldAlert className="w-20 h-20 text-red-500" />
+                      </div>
+                      <CardHeader className="pb-2 relative">
+                         <CardTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-red-500 flex items-center gap-3">
+                            <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                            Live Exposure Matrix (Open)
+                         </CardTitle>
+                         <p className="text-[9px] text-muted-foreground uppercase font-mono mt-1">Currently active threat landscape</p>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-2 gap-4 p-6 relative">
+                         <MiniStat label="Critical" value={stats?.criticalOpen} show={isEnabled('widget_critical_open')} color="text-red-500" bgColor="bg-red-500/5" />
+                         <MiniStat label="High" value={stats?.highOpen} show={isEnabled('widget_high_open')} color="text-orange-500" bgColor="bg-orange-500/5" />
+                         <MiniStat label="Medium" value={stats?.mediumOpen} show={isEnabled('widget_medium_open')} color="text-yellow-500" bgColor="bg-yellow-500/5" />
+                         <MiniStat label="Low" value={stats?.lowOpen} show={isEnabled('widget_low_open')} color="text-blue-500" bgColor="bg-blue-500/5" />
+                      </CardContent>
+                   </Card>
+                 </motion.div>
+               )}
 
-               {/* Closed Tickets by Severity */}
-               <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl border-l-green-500/50 border-l-2">
-                  <CardHeader className="pb-2">
-                     <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-green-500/70 flex items-center gap-2">
-                        <CheckCircle className="w-3 h-3" /> Neutralization History (Closed)
-                     </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6">
-                     <MiniStat label="Critical" value={stats?.criticalClosed} show={isEnabled('widget_critical_closed')} color="text-red-500" />
-                     <MiniStat label="High" value={stats?.highClosed} show={isEnabled('widget_high_closed')} color="text-orange-500" />
-                     <MiniStat label="Medium" value={stats?.mediumClosed} show={isEnabled('widget_medium_closed')} color="text-yellow-500" />
-                     <MiniStat label="Low" value={stats?.lowClosed} show={isEnabled('widget_low_closed')} color="text-blue-500" />
-                  </CardContent>
-               </Card>
+               {/* Neutralization History (Closed) */}
+               {isEnabled('widget_closed_matrix') && (
+                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                   <Card className="bg-black/60 border-green-500/20 backdrop-blur-2xl border-t-green-500/50 border-t-2 overflow-hidden shadow-[0_0_50px_rgba(34,197,94,0.05)] h-full">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                         <ShieldCheck className="w-20 h-20 text-green-500" />
+                      </div>
+                      <CardHeader className="pb-2 relative">
+                         <CardTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-green-500 flex items-center gap-3">
+                            <CheckCircle className="w-4 h-4" />
+                            Neutralization History (Closed)
+                         </CardTitle>
+                         <p className="text-[9px] text-muted-foreground uppercase font-mono mt-1">Total threats mitigated and archived</p>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-2 gap-4 p-6 relative">
+                         <MiniStat label="Critical" value={stats?.criticalClosed} show={isEnabled('widget_critical_closed')} color="text-red-500" bgColor="bg-red-500/5" />
+                         <MiniStat label="High" value={stats?.highClosed} show={isEnabled('widget_high_closed')} color="text-orange-500" bgColor="bg-orange-500/5" />
+                         <MiniStat label="Medium" value={stats?.mediumClosed} show={isEnabled('widget_medium_closed')} color="text-yellow-500" bgColor="bg-yellow-500/5" />
+                         <MiniStat label="Low" value={stats?.lowClosed} show={isEnabled('widget_low_closed')} color="text-blue-500" bgColor="bg-blue-500/5" />
+                      </CardContent>
+                   </Card>
+                 </motion.div>
+               )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

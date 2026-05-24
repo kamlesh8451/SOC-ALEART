@@ -26,7 +26,9 @@ import {
   Zap,
   Globe,
   Monitor,
-  ShieldAlert
+  ShieldAlert,
+  Activity,
+  LayoutDashboard
 } from "lucide-react";
 import { adminService } from "../services/adminService";
 import { mailService } from "../services/mailService";
@@ -60,6 +62,59 @@ const PERMISSION_GROUPS = [
     permissions: ["view_audit_logs"]
   }
 ];
+
+const FeatureToggle = ({ feature, onToggle, compact = false }: { feature: any, onToggle: (n: string, s: boolean) => void, compact?: boolean }) => {
+  if (compact) {
+    return (
+      <div className="flex items-center justify-between p-2 bg-secondary/20 border border-border/50 rounded hover:border-primary/20 transition-all">
+        <span className="text-[8px] font-bold text-muted-foreground uppercase">{feature.name.replace('widget_', '').replace(/_/g, ' ')}</span>
+        <button 
+          onClick={() => onToggle(feature.name, feature.is_enabled)}
+          className={cn(
+            "w-7 h-4 rounded-full relative transition-all duration-300",
+            feature.is_enabled ? "bg-primary" : "bg-muted"
+          )}
+        >
+          <div className={cn(
+            "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all duration-300",
+            feature.is_enabled ? "left-3.5" : "left-0.5"
+          )} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-background border border-border rounded-lg flex items-center justify-between hover:border-primary/20 transition-all group">
+      <div className="flex items-center gap-3">
+        <div className={cn(
+          "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
+          feature.is_enabled ? "bg-primary/10 border-primary/20 text-primary" : "bg-secondary/50 border-border text-muted-foreground"
+        )}>
+          <Activity className={cn("w-4 h-4", feature.is_enabled && "animate-pulse")} />
+        </div>
+        <div>
+          <h4 className="text-[10px] font-bold text-foreground uppercase tracking-tight">
+            {feature.name.replace('widget_', '').replace(/_/g, ' ')}
+          </h4>
+          <p className="text-[8px] text-muted-foreground uppercase leading-tight mt-0.5">{feature.description}</p>
+        </div>
+      </div>
+      <button 
+        onClick={() => onToggle(feature.name, feature.is_enabled)}
+        className={cn(
+          "w-9 h-4.5 rounded-full relative transition-all duration-300",
+          feature.is_enabled ? "bg-primary" : "bg-secondary border border-border"
+        )}
+      >
+        <div className={cn(
+          "absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-all duration-300",
+          feature.is_enabled ? "left-5" : "left-0.5"
+        )} />
+      </button>
+    </div>
+  );
+};
 
 export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId: string) => void }) {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -1289,41 +1344,45 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
                   </div>
 
                   {/* Dashboard Widgets Category */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 border-b border-border/50 pb-2 flex items-center gap-2">
                        <LayoutDashboard className="w-3 h-3" /> Tactical Dashboard Widgets
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {featureFlags.filter(f => f.name.startsWith('widget_')).map((feature) => (
-                        <div key={feature.name} className="p-4 bg-background border border-border rounded-lg flex items-center justify-between hover:border-primary/20 transition-all group">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
-                              feature.is_enabled ? "bg-primary/10 border-primary/20 text-primary" : "bg-secondary/50 border-border text-muted-foreground"
-                            )}>
-                              <Activity className={cn("w-4 h-4", feature.is_enabled && "animate-pulse")} />
-                            </div>
-                            <div>
-                              <h4 className="text-[10px] font-bold text-foreground uppercase tracking-tight">
-                                {feature.name.replace('widget_', '').replace(/_/g, ' ')}
-                              </h4>
-                              <p className="text-[8px] text-muted-foreground uppercase leading-tight mt-0.5">{feature.description}</p>
-                            </div>
+                    
+                    {/* Operational KPIs */}
+                    <div className="space-y-3">
+                       <p className="text-[8px] font-black text-primary/40 uppercase tracking-widest px-1">Primary Operational KPIs</p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {featureFlags.filter(f => ['widget_active_threats', 'widget_mtta', 'widget_mttr', 'widget_closed_total'].includes(f.name)).map((feature) => (
+                            <FeatureToggle key={feature.name} feature={feature} onToggle={handleToggleFeature} />
+                          ))}
+                       </div>
+                    </div>
+
+                    {/* Open Matrix Controls */}
+                    <div className="space-y-3">
+                       <p className="text-[8px] font-black text-red-500/40 uppercase tracking-widest px-1">Live Exposure Matrix (Open)</p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <FeatureToggle feature={featureFlags.find(f => f.name === 'widget_open_matrix') || { name: 'widget_open_matrix', is_enabled: true, description: 'Master switch for open matrix' }} onToggle={handleToggleFeature} />
+                          <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                             {featureFlags.filter(f => ['widget_critical_open', 'widget_high_open', 'widget_medium_open', 'widget_low_open'].includes(f.name)).map((feature) => (
+                               <FeatureToggle key={feature.name} feature={feature} onToggle={handleToggleFeature} compact />
+                             ))}
                           </div>
-                          <button 
-                            onClick={() => handleToggleFeature(feature.name, feature.is_enabled)}
-                            className={cn(
-                              "w-9 h-4.5 rounded-full relative transition-all duration-300",
-                              feature.is_enabled ? "bg-primary" : "bg-secondary border border-border"
-                            )}
-                          >
-                            <div className={cn(
-                              "absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-all duration-300",
-                              feature.is_enabled ? "left-5" : "left-0.5"
-                            )} />
-                          </button>
-                        </div>
-                      ))}
+                       </div>
+                    </div>
+
+                    {/* Closed Matrix Controls */}
+                    <div className="space-y-3">
+                       <p className="text-[8px] font-black text-green-500/40 uppercase tracking-widest px-1">Neutralization History (Closed)</p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <FeatureToggle feature={featureFlags.find(f => f.name === 'widget_closed_matrix') || { name: 'widget_closed_matrix', is_enabled: true, description: 'Master switch for closed history' }} onToggle={handleToggleFeature} />
+                          <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                             {featureFlags.filter(f => ['widget_critical_closed', 'widget_high_closed', 'widget_medium_closed', 'widget_low_closed'].includes(f.name)).map((feature) => (
+                               <FeatureToggle key={feature.name} feature={feature} onToggle={handleToggleFeature} compact />
+                             ))}
+                          </div>
+                       </div>
                     </div>
                   </div>
 
