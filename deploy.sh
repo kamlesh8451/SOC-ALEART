@@ -79,18 +79,19 @@ NODE_OPTIONS="--max-old-space-size=1536" npm run build -w frontend
 rm frontend/.env
 
 echo "[5/6] Orchestrating SOC Services (PM2)..."
-# Smart restart: check if already running, otherwise start fresh
+# Smart restart: ensure we clear both sudo and non-sudo PM2 instances to avoid conflicts
 pm2 delete soc-backend soc-frontend 2>/dev/null || true
+sudo pm2 delete soc-backend soc-frontend 2>/dev/null || true
 sudo fuser -k 3001/tcp 2>/dev/null || true
 sudo fuser -k 80/tcp 2>/dev/null || true
 
 cd backend
-pm2 start dist/server.cjs --name "soc-backend"
+sudo pm2 start dist/server.cjs --name "soc-backend" --force
 cd ..
-sudo pm2 serve frontend/dist 80 --name "soc-frontend" --spa
+sudo pm2 serve frontend/dist 80 --name "soc-frontend" --spa --force
 
 echo "[6/6] Finalizing Stability..."
-pm2 save || true
+sudo pm2 save || true
 
 echo "============================================"
 echo "DEPLOYMENT COMPLETE!"
