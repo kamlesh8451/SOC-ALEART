@@ -69,7 +69,7 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
   
-  const [newUser, setNewUser] = useState<Omit<UserProfile, 'id'>>({ email: '', name: '', role: '', permissions: [] });
+  const [newUser, setNewUser] = useState<Omit<UserProfile, 'id'>>({ email: '', name: '', role: '', permissions: [], password: '' });
   const [newRule, setNewRule] = useState<Omit<AssignmentRule, 'id'>>({
     name: '',
     keyword: '',
@@ -166,17 +166,24 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
 
   const handleCreateUser = async () => {
     if (!newUser.email || !newUser.name || !newUser.role) return toast.error("Fill all required user fields");
+    if (!editingId && !newUser.password) return toast.error("Initial password required for new operatives");
+    
     setLoading(true);
     try {
+      const payload = { ...newUser };
+      if (editingId && !payload.password) {
+        delete payload.password; // Don't update password if empty during edit
+      }
+
       if (editingId) {
-        await adminService.updateUser(editingId, newUser);
+        await adminService.updateUser(editingId, payload);
         toast.success("Operative credentials updated");
         setEditingId(null);
       } else {
-        await adminService.createUser(newUser);
+        await adminService.createUser(payload);
         toast.success("User provisioned successfully");
       }
-      setNewUser({ email: '', name: '', role: '', permissions: [] });
+      setNewUser({ email: '', name: '', role: '', permissions: [], password: '' });
     } catch (e) {
       toast.error(editingId ? "Update failed" : "Provisioning failed");
     } finally {
@@ -256,7 +263,7 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
 
   const startEditUser = (user: UserProfile) => {
     setEditingId(user.id);
-    setNewUser({ email: user.email, name: user.name, role: user.role, permissions: user.permissions || [] });
+    setNewUser({ email: user.email, name: user.name, role: user.role, permissions: user.permissions || [], password: '' });
     setActiveTab('users');
   };
 
@@ -282,7 +289,7 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
 
   const cancelEdit = () => {
     setEditingId(null);
-    setNewUser({ email: '', name: '', role: '', permissions: [] });
+    setNewUser({ email: '', name: '', role: '', permissions: [], password: '' });
     setNewRule({ 
       name: '',
       keyword: '', 
@@ -554,8 +561,18 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
                       <Input value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} placeholder="Agent Name" className="bg-secondary border-border h-10 text-xs" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Digital Address</label>
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Digital Address (Email)</label>
                       <Input value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="agent@command.mil" className="bg-secondary border-border h-10 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Secure Access Key (Password)</label>
+                      <Input 
+                        type="password" 
+                        value={newUser.password} 
+                        onChange={e => setNewUser({...newUser, password: e.target.value})} 
+                        placeholder={editingId ? "Leave blank to keep current" : "Set initial password"} 
+                        className="bg-secondary border-border h-10 text-xs font-mono" 
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Operational Role Designation</label>

@@ -46,6 +46,7 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   permissions?: string[];
+  password?: string;
 }
 
 export interface AssignmentRule {

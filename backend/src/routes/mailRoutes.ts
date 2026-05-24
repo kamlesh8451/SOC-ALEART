@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import pool from '../config/db';
 import { EmailIngestionService } from '../services/EmailIngestionService';
+import { authorize } from '../middleware/auth';
 
 const router = Router();
 
 // Get mailbox settings
-router.get('/settings', async (req, res, next) => {
+router.get('/settings', authorize(['manage_rules']), async (req, res, next) => {
   try {
     const result = await pool.query('SELECT id, host, port, ssl, username, poll_interval, is_active FROM mailbox_settings LIMIT 1');
     res.json(result.rows[0] || null);
@@ -15,7 +16,7 @@ router.get('/settings', async (req, res, next) => {
 });
 
 // Update mailbox settings
-router.post('/settings', async (req, res, next) => {
+router.post('/settings', authorize(['manage_rules']), async (req, res, next) => {
   try {
     const { host, port, ssl, username, password, poll_interval, is_active } = req.body;
     
@@ -50,7 +51,7 @@ router.post('/settings', async (req, res, next) => {
 });
 
 // Get email logs
-router.get('/logs', async (req, res, next) => {
+router.get('/logs', authorize(['view_audit_logs']), async (req, res, next) => {
   try {
     const { incidentId } = req.query;
     let query = 'SELECT * FROM email_logs';
