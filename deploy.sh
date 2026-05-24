@@ -19,7 +19,20 @@ else
     echo "PM2 $(pm2 -v) is already installed."
 fi
 
-echo "[2/6] Syncing Workspace Dependencies..."
+echo "[2/6] Syncing Workspace Dependencies & Optimizing Memory..."
+# Ensure Swap Space for small instances (OOM prevention during Vite build)
+if [ -f /proc/meminfo ]; then
+    MEM_TOTAL=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    if [ "$MEM_TOTAL" -lt 2000000 ] && [ ! -f /swapfile ]; then
+        echo "Low memory detected (<2GB). Adding 2GB swap space for stability..."
+        sudo fallocate -l 2G /swapfile
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    fi
+fi
+
 # Use --prefer-offline to speed up installs if nodes_modules already exists
 npm install --no-audit --no-fund --prefer-offline
 
@@ -61,7 +74,7 @@ cat <<EOF > frontend/.env
 VITE_API_URL=http://$EC2_IP:3001
 VITE_SOCKET_URL=http://$EC2_IP:3001
 EOF
-npm run build -w frontend
+NODE_OPTIONS="--max-old-space-size=1536" npm run build -w frontend
 rm frontend/.env
 
 echo "[5/6] Orchestrating SOC Services (PM2)..."

@@ -45,9 +45,9 @@ function buildPoolConfig() {
     connectionString = raw.replace(/[?&]sslmode=require/g, '');
   }
 
-  // Use rejectUnauthorized: false ONLY if explicitly forced by the env var, otherwise default to true for security.
+  // Use rejectUnauthorized: false by default for managed DBs like Aiven, unless explicitly set to true.
   const sslConfig = needsSsl 
-    ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'false' ? false : true } 
+    ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true' ? true : false } 
     : undefined;
 
   return {
