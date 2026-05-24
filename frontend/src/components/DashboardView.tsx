@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useSocket } from '@/lib/useSocket';
 import { incidentService } from '@/services/incidentService';
+import { adminService } from '@/services/adminService';
 import { Incident } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { 
   Shield, AlertTriangle, CheckCircle, Clock, 
   LayoutDashboard, Ticket, Settings, ShieldAlert,
   Activity, MoreHorizontal, LogOut, Search, Bell, ShieldCheck,
-  FileBarChart
+  FileBarChart, Zap, TrendingUp, History, UserCheck
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { ReportsHubView } from './ReportsHubView';
 import { GlobalSearch } from './GlobalSearch';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export const DashboardView: React.FC = () => {
   const { user, logout } = useAuth();
@@ -33,6 +35,9 @@ export const DashboardView: React.FC = () => {
   const [initialIncidentId, setInitialIncidentId] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
+  const [featureFlags, setFeatureFlags] = useState<any[]>([]);
+  const [recentIncidents, setRecentIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Basic Deep Linking for email buttons
@@ -40,7 +45,6 @@ export const DashboardView: React.FC = () => {
     const incidentId = params.get('incidentId');
     if (incidentId) {
       handleViewIncident(incidentId);
-      // Clean up the URL to prevent re-triggering on refresh
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     }
@@ -56,89 +60,121 @@ export const DashboardView: React.FC = () => {
       setInitialIncidentId(null);
     }
   }, [currentView]);
-  const [recentIncidents, setRecentIncidents] = useState<Incident[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      const [statsData, analyticsData, incidentsData, flagsData] = await Promise.all([
+        incidentService.getStats(),
+        incidentService.getAnalytics(),
+        incidentService.getIncidents(),
+        adminService.getFeatureFlags()
+      ]);
+      setStats(statsData);
+      setAnalytics(analyticsData);
+      setRecentIncidents(incidentsData.slice(0, 5));
+      setFeatureFlags(flagsData);
+      setLoading(false);
+    } catch (e) {
+      console.error("Sync error", e);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsData, analyticsData, incidentsData] = await Promise.all([
-          incidentService.getStats(),
-          incidentService.getAnalytics(),
-          incidentService.getIncidents()
-        ]);
-        setStats(statsData);
-        setAnalytics(analyticsData);
-        setRecentIncidents(incidentsData.slice(0, 5));
-        setLoading(false);
-      } catch (e) {
-        console.error("Sync error", e);
-      }
-    };
-
     fetchData();
-    const statsInterval = setInterval(fetchData, 30000); // Refresh every 30s
+    const statsInterval = setInterval(fetchData, 30000);
 
-    // Set up real-time listener for updates (polling fallback)
     const unsub = incidentService.subscribeToIncidents((data) => {
       setRecentIncidents(data.slice(0, 5));
-      setLoading(false);
-      // stats refresh handled by statsInterval or socket
     });
 
-    // High-Reflectivity Socket Listener
     if (socket) {
       socket.on('incidents_updated', (data) => {
-        console.log('[WS] High-priority update received:', data);
-        toast.info(`Tactical update: ${data.type}`, {
-          description: "Syncing incident registry...",
-          duration: 3000
-        });
-        fetchData(); // Trigger immediate full refresh (stats + list)
+        console.log('[WS] Tactical update:', data);
+        fetchData();
       });
     }
 
     return () => {
       unsub();
       clearInterval(statsInterval);
-      if (socket) {
-        socket.off('incidents_updated');
-      }
+      if (socket) socket.off('incidents_updated');
     };
   }, [socket]);
 
+  const isEnabled = (flagName: string) => {
+    const flag = featureFlags.find(f => f.name === flagName);
+    return flag ? flag.is_enabled : true; // Default to true if not found
+  };
+
   const renderContent = () => {
     switch (currentView) {
-      case 'rules':
-        return <RoutingRulesView />;
-      case 'admin':
-        return <AdminSettings onViewIncident={handleViewIncident} />;
-      case 'incidents':
-        return <IncidentsListView initialIncidentId={initialIncidentId} />;
-      case 'intel':
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-cyan-500/10 pb-4">
-               <div>
-                  <h2 className="text-xl font-bold uppercase tracking-tighter text-white">Live Threat Intelligence</h2>
-                  <p className="text-[10px] text-cyan-500/50 font-mono">Global Node Status & Real-time Attack Surface Visualization</p>
-               </div>
-               <Badge className="bg-green-500/10 text-green-500 border-green-500/20">NETWORK_NOMINAL</Badge>
-            </div>
-            <ThreatMap incidents={recentIncidents} onSelectIncident={handleViewIncident} />
+      case 'rules': return <RoutingRulesView />;
+      case 'admin': return <AdminSettings onViewIncident={handleViewIncident} />;
+      case 'incidents': return <IncidentsListView initialIncidentId={initialIncidentId} />;
+      case 'intel': return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between border-b border-cyan-500/10 pb-4">
+             <div>
+                <h2 className="text-xl font-bold uppercase tracking-tighter text-white">Live Threat Intelligence</h2>
+                <p className="text-[10px] text-cyan-500/50 font-mono">Global Node Status Visualization</p>
+             </div>
+             <Badge className="bg-green-500/10 text-green-500 border-green-500/20">NETWORK_NOMINAL</Badge>
           </div>
-        );
-      case 'reports':
-        return <ReportsHubView />;
+          <ThreatMap incidents={recentIncidents} onSelectIncident={handleViewIncident} />
+        </div>
+      );
+      case 'reports': return <ReportsHubView />;
       case 'dashboard':
       default:
         return (
-          <>
+          <div className="space-y-8">
+            {/* Top Level KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <KPICard title="ACTIVE THREATS" value={stats?.open || '0'} trend="+3.2%" icon={<AlertTriangle className="text-red-500" />} color="red" />
-              <KPICard title="AVG ACK (MTTA)" value={`${analytics?.mtta || 0}m`} trend="Target < 15m" icon={<Activity className="text-cyan-500" />} color="cyan" />
-              <KPICard title="AVG RESOLVE (MTTR)" value={`${analytics?.mttr || 0}h`} trend="Target < 24h" icon={<CheckCircle className="text-green-500" />} color="green" />
-              <KPICard title="CLOSED TICKETS" value={stats?.closed || '0'} trend="+12.4%" icon={<ShieldCheck className="text-purple-500" />} color="purple" />
+              {isEnabled('widget_active_threats') && (
+                <KPICard title="ACTIVE THREATS" value={stats?.activeThreats || '0'} subValue={`${stats?.open || 0} Unassigned`} icon={<AlertTriangle className="text-red-500" />} color="red" />
+              )}
+              {isEnabled('widget_mtta') && (
+                <KPICard title="AVG ACK (MTTA)" value={`${analytics?.mtta || 0}m`} trend="Target < 15m" icon={<Activity className="text-cyan-500" />} color="cyan" />
+              )}
+              {isEnabled('widget_mttr') && (
+                <KPICard title="AVG RESOLVE (MTTR)" value={`${analytics?.mttr || 0}h`} trend="Target < 24h" icon={<History className="text-green-500" />} color="green" />
+              )}
+              {isEnabled('widget_closed_total') && (
+                <KPICard title="All CLOSED TICKETS" value={stats?.closed || '0'} trend="Total Life Cycle" icon={<ShieldCheck className="text-purple-500" />} color="purple" />
+              )}
+            </div>
+
+            {/* Granular Metrics Grids */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               {/* Open Tickets by Severity */}
+               <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl border-l-red-500/50 border-l-2">
+                  <CardHeader className="pb-2">
+                     <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-red-500/70 flex items-center gap-2">
+                        <Zap className="w-3 h-3" /> Live Exposure Matrix (Open)
+                     </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6">
+                     <MiniStat label="Critical" value={stats?.criticalOpen} show={isEnabled('widget_critical_open')} color="text-red-500" />
+                     <MiniStat label="High" value={stats?.highOpen} show={isEnabled('widget_high_open')} color="text-orange-500" />
+                     <MiniStat label="Medium" value={stats?.mediumOpen} show={isEnabled('widget_medium_open')} color="text-yellow-500" />
+                     <MiniStat label="Low" value={stats?.lowOpen} show={isEnabled('widget_low_open')} color="text-blue-500" />
+                  </CardContent>
+               </Card>
+
+               {/* Closed Tickets by Severity */}
+               <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl border-l-green-500/50 border-l-2">
+                  <CardHeader className="pb-2">
+                     <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-green-500/70 flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3" /> Neutralization History (Closed)
+                     </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6">
+                     <MiniStat label="Critical" value={stats?.criticalClosed} show={isEnabled('widget_critical_closed')} color="text-red-500" />
+                     <MiniStat label="High" value={stats?.highClosed} show={isEnabled('widget_high_closed')} color="text-orange-500" />
+                     <MiniStat label="Medium" value={stats?.mediumClosed} show={isEnabled('widget_medium_closed')} color="text-yellow-500" />
+                     <MiniStat label="Low" value={stats?.lowClosed} show={isEnabled('widget_low_closed')} color="text-blue-500" />
+                  </CardContent>
+               </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -181,10 +217,10 @@ export const DashboardView: React.FC = () => {
                         <PieChart>
                           <Pie
                             data={[
-                              { name: 'Critical', value: stats?.critical || 0, color: '#ef4444' },
-                              { name: 'High', value: stats?.high || 0, color: '#f97316' },
-                              { name: 'Medium', value: stats?.medium || 0, color: '#eab308' },
-                              { name: 'Low', value: stats?.low || 0, color: '#3b82f6' },
+                              { name: 'Critical', value: (stats?.criticalOpen + stats?.criticalClosed) || 0, color: '#ef4444' },
+                              { name: 'High', value: (stats?.highOpen + stats?.highClosed) || 0, color: '#f97316' },
+                              { name: 'Medium', value: (stats?.mediumOpen + stats?.mediumClosed) || 0, color: '#eab308' },
+                              { name: 'Low', value: (stats?.lowOpen + stats?.lowClosed) || 0, color: '#3b82f6' },
                             ].filter(d => d.value > 0)}
                             cx="50%"
                             cy="50%"
@@ -205,20 +241,6 @@ export const DashboardView: React.FC = () => {
                           <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #67e8f930', borderRadius: '8px', fontSize: '10px' }} />
                         </PieChart>
                       </ResponsiveContainer>
-                      <div className="grid grid-cols-2 gap-4 mt-6 w-full">
-                         {[
-                            { name: 'Critical', color: '#ef4444' },
-                            { name: 'High', color: '#f97316' },
-                            { name: 'Medium', color: '#eab308' },
-                            { name: 'Low', color: '#3b82f6' },
-                         ].map((item) => (
-                           <div key={item.name} className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                              <span className="text-[10px] font-bold text-white/70 uppercase tracking-tighter">{item.name}</span>
-                              <span className="text-[10px] text-white ml-auto">{stats?.[item.name.toLowerCase()] || 0}</span>
-                           </div>
-                         ))}
-                      </div>
                     </>
                   )}
                 </CardContent>
@@ -234,7 +256,7 @@ export const DashboardView: React.FC = () => {
                </CardHeader>
                <CardContent>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left text-white">
                       <thead>
                         <tr className="border-b border-cyan-500/10 text-[10px] uppercase text-cyan-500/50 font-bold tracking-widest">
                           <th className="pb-4 pl-2 font-bold">Ticket ID</th>
@@ -255,10 +277,10 @@ export const DashboardView: React.FC = () => {
                             <td className="py-4 font-bold text-white/90 truncate max-w-[200px] uppercase">{inc.alertName}</td>
                             <td className="py-4">
                               <Badge className={cn(
-                                "text-[9px] uppercase font-black px-2 py-0.5 rounded-full",
-                                inc.severity === 'critical' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
-                                inc.severity === 'high' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 
-                                'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                "text-[9px] uppercase font-black px-2 py-0.5 rounded-full border-none",
+                                inc.severity === 'critical' ? 'bg-red-500/10 text-red-500' : 
+                                inc.severity === 'high' ? 'bg-orange-500/10 text-orange-500' : 
+                                'bg-yellow-500/10 text-yellow-500'
                               )}>
                                 {inc.severity}
                               </Badge>
@@ -280,7 +302,7 @@ export const DashboardView: React.FC = () => {
                   </div>
                </CardContent>
             </Card>
-          </>
+          </div>
         );
     }
   };
@@ -336,7 +358,7 @@ export const DashboardView: React.FC = () => {
                 <span className="text-[10px] font-mono font-bold text-cyan-500/70 tracking-[0.3em] uppercase">Tactical Operations Command</span>
               </div>
               <h1 className="text-4xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-cyan-500/80">HQ Command Center</h1>
-              <p className="text-cyan-500/40 text-[9px] font-mono uppercase tracking-[0.25em] mt-2 max-w-xl leading-relaxed">Centralized Security Orchestration Hub v4.2.1-STABLE</p>
+              <p className="text-cyan-500/40 text-[9px] font-mono uppercase tracking-[0.25em] mt-2 max-w-xl leading-relaxed">Centralized Security Orchestration Hub v5.0.0-PRO</p>
             </div>
             <div className="flex items-center gap-4">
                <GlobalSearch onSelectIncident={handleViewIncident} />
@@ -377,7 +399,7 @@ const NavItem = ({ icon, label, active = false, onClick }: { icon: React.ReactNo
   </button>
 );
 
-const KPICard = ({ title, value, trend, icon, color }: any) => (
+const KPICard = ({ title, value, subValue, trend, icon, color }: any) => (
   <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl relative overflow-hidden group hover:border-cyan-500/30 transition-all cursor-default">
     <div className={`absolute top-0 left-0 w-1 h-full bg-${color}-500 opacity-30 group-hover:opacity-100 transition-opacity`} />
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -386,12 +408,25 @@ const KPICard = ({ title, value, trend, icon, color }: any) => (
     </CardHeader>
     <CardContent>
       <div className="text-3xl font-black text-white tracking-tighter">{value}</div>
-      <p className={cn(
-        "text-[10px] font-bold mt-1",
-        trend.startsWith('+') ? 'text-green-500' : 'text-red-500'
-      )}>
-        {trend} <span className="text-white/20 ml-1 font-normal tracking-tight">VS LAST SESSION</span>
-      </p>
+      {subValue && <p className="text-[9px] font-mono text-cyan-500/50 uppercase mt-1 tracking-tighter">{subValue}</p>}
+      {trend && (
+        <p className={cn(
+          "text-[10px] font-bold mt-1",
+          trend.includes('-') || trend.includes('<') ? 'text-cyan-500' : 'text-green-500'
+        )}>
+          {trend} <span className="text-white/20 ml-1 font-normal tracking-tight uppercase">KPI STATUS</span>
+        </p>
+      )}
     </CardContent>
   </Card>
 );
+
+const MiniStat = ({ label, value, color, show }: { label: string, value: number, color: string, show: boolean }) => {
+  if (!show) return null;
+  return (
+    <div className="bg-white/5 p-3 rounded-lg border border-white/5 text-center group hover:bg-white/10 transition-all">
+       <p className={cn("text-[9px] font-black uppercase tracking-widest mb-1", color)}>{label}</p>
+       <p className="text-xl font-bold text-white tracking-tighter">{value || 0}</p>
+    </div>
+  );
+};

@@ -455,10 +455,18 @@ export const incidentController = {
           COUNT(*) FILTER (WHERE status = 'open') as open_count,
           COUNT(*) FILTER (WHERE status = 'investigating') as investigating_count,
           COUNT(*) FILTER (WHERE status = 'closed') as closed_count,
-          COUNT(*) FILTER (WHERE severity = 'critical') as critical_count,
-          COUNT(*) FILTER (WHERE severity = 'high') as high_count,
-          COUNT(*) FILTER (WHERE severity = 'medium' OR severity = 'TEST') as medium_count,
-          COUNT(*) FILTER (WHERE severity = 'low') as low_count,
+          
+          COUNT(*) FILTER (WHERE severity = 'critical' AND status != 'closed') as critical_open,
+          COUNT(*) FILTER (WHERE severity = 'high' AND status != 'closed') as high_open,
+          COUNT(*) FILTER (WHERE (severity = 'medium' OR severity = 'TEST') AND status != 'closed') as medium_open,
+          COUNT(*) FILTER (WHERE severity = 'low' AND status != 'closed') as low_open,
+          
+          COUNT(*) FILTER (WHERE severity = 'critical' AND status = 'closed') as critical_closed,
+          COUNT(*) FILTER (WHERE severity = 'high' AND status = 'closed') as high_closed,
+          COUNT(*) FILTER (WHERE (severity = 'medium' OR severity = 'TEST') AND status = 'closed') as medium_closed,
+          COUNT(*) FILTER (WHERE severity = 'low' AND status = 'closed') as low_closed,
+          
+          COUNT(*) FILTER (WHERE status != 'closed') as active_threats,
           COUNT(*) as total_count
         FROM incidents
       `);
@@ -477,14 +485,23 @@ export const incidentController = {
       const stats = statsRes.rows[0];
       
       res.json({
-        version: '4.2.1-FIXED-STATS',
+        version: '5.0.0-GRANULAR-METRICS',
         open: parseInt(stats.open_count || '0'),
         investigating: parseInt(stats.investigating_count || '0'),
         closed: parseInt(stats.closed_count || '0'),
-        critical: parseInt(stats.critical_count || '0'),
-        high: parseInt(stats.high_count || '0'),
-        medium: parseInt(stats.medium_count || '0'),
-        low: parseInt(stats.low_count || '0'),
+        
+        activeThreats: parseInt(stats.active_threats || '0'),
+        
+        criticalOpen: parseInt(stats.critical_open || '0'),
+        highOpen: parseInt(stats.high_open || '0'),
+        mediumOpen: parseInt(stats.medium_open || '0'),
+        lowOpen: parseInt(stats.low_open || '0'),
+        
+        criticalClosed: parseInt(stats.critical_closed || '0'),
+        highClosed: parseInt(stats.high_closed || '0'),
+        mediumClosed: parseInt(stats.medium_closed || '0'),
+        lowClosed: parseInt(stats.low_closed || '0'),
+        
         total: parseInt(stats.total_count || '0'),
         compliance: stats.total_count > 0 
           ? Math.round((parseInt(stats.closed_count || '0') / parseInt(stats.total_count || '0')) * 100) 

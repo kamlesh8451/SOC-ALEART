@@ -150,7 +150,20 @@ CREATE TABLE IF NOT EXISTS feature_flags (
 );
 
 INSERT INTO feature_flags (name, is_enabled, description)
-VALUES ('graph_intelligence', TRUE, 'Visual link analysis of hosts, IPs, and related incidents')
+VALUES 
+  ('graph_intelligence', TRUE, 'Visual link analysis of hosts, IPs, and related incidents'),
+  ('widget_active_threats', TRUE, 'Show Active Threats (Open + Investigating) count on dashboard'),
+  ('widget_mtta', TRUE, 'Show Mean Time to Acknowledge (MTTA) on dashboard'),
+  ('widget_mttr', TRUE, 'Show Mean Time to Resolve (MTTR) on dashboard'),
+  ('widget_closed_total', TRUE, 'Show total closed tickets count on dashboard'),
+  ('widget_critical_closed', TRUE, 'Show critical closed tickets count on dashboard'),
+  ('widget_high_closed', TRUE, 'Show high closed tickets count on dashboard'),
+  ('widget_medium_closed', TRUE, 'Show medium closed tickets count on dashboard'),
+  ('widget_low_closed', TRUE, 'Show low closed tickets count on dashboard'),
+  ('widget_critical_open', TRUE, 'Show critical open tickets count on dashboard'),
+  ('widget_high_open', TRUE, 'Show high open tickets count on dashboard'),
+  ('widget_medium_open', TRUE, 'Show medium open tickets count on dashboard'),
+  ('widget_low_open', TRUE, 'Show low open tickets count on dashboard')
 ON CONFLICT (name) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS audit_logs (

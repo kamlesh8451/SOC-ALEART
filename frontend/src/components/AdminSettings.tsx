@@ -1282,58 +1282,103 @@ export function AdminSettings({ onViewIncident }: { onViewIncident?: (incidentId
               )}
 
               {activeTab === 'features' && (
-                <div className="space-y-4">
+                <div className="space-y-8">
                   <div className="flex items-center gap-2 mb-2">
                     <Zap className="w-4 h-4 text-primary" />
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Advanced System Modules</h3>
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-primary/80">Command & Control (Feature Matrix)</h3>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
-                    {featureFlags.map((feature) => (
-                      <div key={feature.name} className="p-5 bg-background border border-border rounded-lg flex items-center justify-between hover:border-primary/20 transition-all group">
-                        <div className="flex items-center gap-4">
-                          <div className={cn(
-                            "w-12 h-12 rounded-xl flex items-center justify-center border transition-all",
-                            feature.is_enabled ? "bg-primary/10 border-primary/20 text-primary shadow-lg shadow-primary/5" : "bg-secondary/50 border-border text-muted-foreground"
-                          )}>
-                            <Shield className={cn("w-6 h-6", feature.is_enabled && "animate-pulse")} />
+                  {/* Dashboard Widgets Category */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 border-b border-border/50 pb-2 flex items-center gap-2">
+                       <LayoutDashboard className="w-3 h-3" /> Tactical Dashboard Widgets
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {featureFlags.filter(f => f.name.startsWith('widget_')).map((feature) => (
+                        <div key={feature.name} className="p-4 bg-background border border-border rounded-lg flex items-center justify-between hover:border-primary/20 transition-all group">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
+                              feature.is_enabled ? "bg-primary/10 border-primary/20 text-primary" : "bg-secondary/50 border-border text-muted-foreground"
+                            )}>
+                              <Activity className={cn("w-4 h-4", feature.is_enabled && "animate-pulse")} />
+                            </div>
+                            <div>
+                              <h4 className="text-[10px] font-bold text-foreground uppercase tracking-tight">
+                                {feature.name.replace('widget_', '').replace(/_/g, ' ')}
+                              </h4>
+                              <p className="text-[8px] text-muted-foreground uppercase leading-tight mt-0.5">{feature.description}</p>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-foreground uppercase tracking-tighter flex items-center gap-2">
-                              {feature.name.replace(/_/g, ' ')}
-                              {feature.is_enabled && <Badge className="bg-primary/10 text-primary border-primary/20 text-[7px] h-3.5 px-1 font-black">ACTIVE</Badge>}
-                            </h4>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[400px]">{feature.description}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={cn("text-[9px] font-bold uppercase tracking-widest", feature.is_enabled ? "text-primary" : "text-muted-foreground")}>
-                            {feature.is_enabled ? 'ENABLED' : 'DISABLED'}
-                          </span>
                           <button 
                             onClick={() => handleToggleFeature(feature.name, feature.is_enabled)}
                             className={cn(
-                              "w-12 h-6 rounded-full relative transition-all duration-300 shadow-inner",
+                              "w-9 h-4.5 rounded-full relative transition-all duration-300",
                               feature.is_enabled ? "bg-primary" : "bg-secondary border border-border"
                             )}
                           >
                             <div className={cn(
-                              "absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm",
-                              feature.is_enabled ? "left-7" : "left-1"
+                              "absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-all duration-300",
+                              feature.is_enabled ? "left-5" : "left-0.5"
                             )} />
                           </button>
                         </div>
-                      </div>
-                    ))}
-                    
-                    {featureFlags.length === 0 && (
-                      <div className="p-20 text-center border-2 border-dashed border-border rounded-xl">
-                        <Zap className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-30" />
-                        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No Experimental Modules</h3>
-                        <p className="text-xs text-muted-foreground/60 mt-1">Advanced system features will appear here for command override.</p>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Analysis Engines Category */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 border-b border-border/50 pb-2 flex items-center gap-2">
+                       <Shield className="w-3 h-3" /> Analysis & Logic Engines
+                    </h4>
+                    <div className="grid grid-cols-1 gap-4">
+                      {featureFlags.filter(f => !f.name.startsWith('widget_')).map((feature) => (
+                        <div key={feature.name} className="p-5 bg-background border border-border rounded-lg flex items-center justify-between hover:border-primary/20 transition-all group">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "w-12 h-12 rounded-xl flex items-center justify-center border transition-all",
+                              feature.is_enabled ? "bg-primary/10 border-primary/20 text-primary shadow-lg shadow-primary/5" : "bg-secondary/50 border-border text-muted-foreground"
+                            )}>
+                              <Shield className={cn("w-6 h-6", feature.is_enabled && "animate-pulse")} />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-foreground uppercase tracking-tighter flex items-center gap-2">
+                                {feature.name.replace(/_/g, ' ')}
+                                {feature.is_enabled && <Badge className="bg-primary/10 text-primary border-primary/20 text-[7px] h-3.5 px-1 font-black">ACTIVE</Badge>}
+                              </h4>
+                              <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[400px]">{feature.description}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={cn("text-[9px] font-bold uppercase tracking-widest", feature.is_enabled ? "text-primary" : "text-muted-foreground")}>
+                              {feature.is_enabled ? 'ENABLED' : 'DISABLED'}
+                            </span>
+                            <button 
+                              onClick={() => handleToggleFeature(feature.name, feature.is_enabled)}
+                              className={cn(
+                                "w-12 h-6 rounded-full relative transition-all duration-300 shadow-inner",
+                                feature.is_enabled ? "bg-primary" : "bg-secondary border border-border"
+                              )}
+                            >
+                              <div className={cn(
+                                "absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm",
+                                feature.is_enabled ? "left-7" : "left-1"
+                              )} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {featureFlags.length === 0 && (
+                    <div className="p-20 text-center border-2 border-dashed border-border rounded-xl">
+                      <Zap className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-30" />
+                      <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No Signal from Command Registry</h3>
+                      <p className="text-xs text-muted-foreground/60 mt-1">Check database synchronization protocols.</p>
+                    </div>
+                  )}
                 </div>
               )}
              </motion.div>
