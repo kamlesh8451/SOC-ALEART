@@ -57,6 +57,7 @@ export const ReportsHubView: React.FC = () => {
       const data = await apiJson<any>(endpoint);
       setPreviewData(data);
     } catch (e) {
+      console.error("[REPORTS] Load failure:", e);
       toast.error("Failed to load tactical preview");
     } finally {
       setLoading(false);
@@ -226,7 +227,7 @@ export const ReportsHubView: React.FC = () => {
                                         <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden shadow-inner">
                                            <motion.div 
                                              initial={{ width: 0 }}
-                                             animate={{ width: `${(h.count / (previewData.summary?.total || 1)) * 100}%` }}
+                                             animate={{ width: `${(h.count / Math.max(previewData.summary?.total || 1, 1)) * 100}%` }}
                                              transition={{ duration: 1.5, ease: "easeOut" }}
                                              className="h-full bg-primary shadow-[0_0_8px_var(--primary-glow)]" 
                                            />
@@ -243,7 +244,7 @@ export const ReportsHubView: React.FC = () => {
                              <div className="flex items-center justify-center p-12 bg-secondary/30 rounded-3xl border border-border shadow-inner relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                                 <div className="text-center relative z-10">
-                                   <div className="text-7xl font-black text-foreground tracking-tighter mb-2 drop-shadow-sm">{previewData.complianceScore}%</div>
+                                   <div className="text-7xl font-black text-foreground tracking-tighter mb-2 drop-shadow-sm">{previewData.complianceScore || 0}%</div>
                                    <div className="text-[11px] font-black uppercase tracking-[0.4em] text-primary">Compliance Score</div>
                                 </div>
                              </div>
@@ -256,7 +257,7 @@ export const ReportsHubView: React.FC = () => {
                                       </div>
                                       <div>
                                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">SLA Breaches</p>
-                                         <p className="text-2xl font-black text-foreground tracking-tighter">{previewData.breaches} Tickets</p>
+                                         <p className="text-2xl font-black text-foreground tracking-tighter">{previewData.breaches || 0} Tickets</p>
                                       </div>
                                    </CardContent>
                                 </Card>
@@ -267,7 +268,7 @@ export const ReportsHubView: React.FC = () => {
                                       </div>
                                       <div>
                                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Avg Resolution</p>
-                                         <p className="text-2xl font-black text-foreground tracking-tighter">{previewData.mttr} Hours</p>
+                                         <p className="text-2xl font-black text-foreground tracking-tighter">{previewData.mttr || 0} Hours</p>
                                       </div>
                                    </CardContent>
                                 </Card>
@@ -280,7 +281,7 @@ export const ReportsHubView: React.FC = () => {
                              <div className="flex items-center justify-between px-1">
                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Recent Indicators of Compromise</h4>
                                 <Badge className="bg-error/10 text-error border-error/20 text-[9px] font-black uppercase px-2 h-5">
-                                   {previewData.maliciousCount} High Risk Identified
+                                   {previewData.maliciousCount || 0} High Risk Identified
                                 </Badge>
                              </div>
                              
@@ -294,7 +295,7 @@ export const ReportsHubView: React.FC = () => {
                                       </tr>
                                    </thead>
                                    <tbody>
-                                      {previewData.indicators?.map((i: any, idx: number) => (
+                                      {(previewData.indicators || []).map((i: any, idx: number) => (
                                         <tr key={idx} className="border-b border-border/40 text-[11px] font-mono hover:bg-primary/5 transition-colors group">
                                            <td className="p-4 pl-6 text-foreground/90 font-bold uppercase tracking-tighter">{i.value}</td>
                                            <td className="p-4 text-center">
@@ -320,6 +321,13 @@ export const ReportsHubView: React.FC = () => {
                              </div>
                           </div>
                         )}
+
+                        {!previewData && !loading && (
+                          <div className="h-full flex flex-col items-center justify-center space-y-4 py-20 opacity-30">
+                             <Shield className="w-16 h-16 text-primary" />
+                             <p className="text-[10px] font-black uppercase tracking-widest">No Intelligence Data Found</p>
+                          </div>
+                        )}
                      </motion.div>
                    )}
                 </AnimatePresence>
@@ -343,6 +351,6 @@ const StatBox = ({ label, value, icon: Icon, color = "text-primary" }: any) => (
         </div>
         <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter opacity-50">{label}</span>
      </div>
-     <div className="text-2xl font-black text-foreground tracking-tighter drop-shadow-sm">{value}</div>
+     <div className="text-2xl font-black text-foreground tracking-tighter drop-shadow-sm">{value || 0}</div>
   </div>
 );

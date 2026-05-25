@@ -117,7 +117,13 @@ export const DashboardView: React.FC = () => {
         
         setStats(statsData);
         setAnalytics(analyticsData);
-        setRecentIncidents(incidentsData.slice(0, 5));
+        
+        // Robust extraction of incident data to prevent .slice failures
+        const incidentsArray = Array.isArray(incidentsData) 
+          ? incidentsData 
+          : (incidentsData && Array.isArray((incidentsData as any).data) ? (incidentsData as any).data : []);
+          
+        setRecentIncidents(incidentsArray.slice(0, 5));
         setFeatureFlags(flagsData);
         setLoading(false);
       }
@@ -136,8 +142,13 @@ export const DashboardView: React.FC = () => {
     fetchData(isMounted);
     const statsInterval = setInterval(() => fetchData(isMounted), 30000);
 
-    const unsub = incidentService.subscribeToIncidents((data) => {
-      if (isMounted) setRecentIncidents(data.slice(0, 5));
+    const unsub = incidentService.subscribeToIncidents((res) => {
+      if (isMounted) {
+        const incidentsArray = Array.isArray(res) 
+          ? res 
+          : (res && Array.isArray((res as any).data) ? (res as any).data : []);
+        setRecentIncidents(incidentsArray.slice(0, 5));
+      }
     });
 
     if (socket) {
