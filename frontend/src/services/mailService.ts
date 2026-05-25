@@ -9,6 +9,9 @@ export interface MailSettings {
   password?: string;
   poll_interval: number;
   is_active: boolean;
+  last_sync_at?: string;
+  last_sync_status?: string;
+  last_error?: string;
 }
 
 export const mailService = {
@@ -27,5 +30,13 @@ export const mailService = {
   async getLogs(incidentId?: string) {
     const url = incidentId ? `/api/mail/logs?incidentId=${incidentId}` : "/api/mail/logs";
     return apiJson<any[]>(url);
+  },
+
+  async sendReply(incidentId: string, message: string) {
+    return apiJson("/api/mail/reply", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ incidentId, message })
+    });
   }
 };

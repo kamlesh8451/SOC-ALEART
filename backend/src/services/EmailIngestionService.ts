@@ -1,5 +1,6 @@
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
+import sanitizeHtml from 'sanitize-html';
 import pool from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 import { getAssignmentForIncident } from './assignmentService';
@@ -11,6 +12,14 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+
+const sanitizeOptions = {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'br']),
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    'img': ['src', 'alt', 'width', 'height']
+  }
+};
 
 const getDirname = () => {
   try {
@@ -68,11 +77,23 @@ export class EmailIngestionService {
 
     client.on('error', (err) => {
       console.error(`[MAIL] ImapFlow Protocol Error (${settings.username}):`, err.message || err);
+      // Update health status on error
+      pool.query(
+        'UPDATE mailbox_settings SET last_error = $1, last_sync_status = $2 WHERE username = $3',
+        [err.message || 'Unknown protocol error', 'ERROR', settings.username]
+      ).catch(() => {});
     });
 
     try {
       await client.connect();
       console.log(`[MAIL] Connected successfully to ${settings.host} (${settings.username})`);
+      
+      // Update health status on success
+      await pool.query(
+        'UPDATE mailbox_settings SET last_sync_at = NOW(), last_sync_status = $1, last_error = NULL WHERE username = $2',
+        ['CONNECTED', settings.username]
+      );
+
       const lock = await client.getMailboxLock('INBOX');
       try {
         // Optimized: Only search for UNSEEN emails to avoid re-processing 
@@ -113,14 +134,21 @@ export class EmailIngestionService {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('[MAIL] Connection error:', message);
+      // Update health status on connection failure
+      await pool.query(
+        'UPDATE mailbox_settings SET last_error = $1, last_sync_status = $2 WHERE username = $3',
+        [message, 'ERROR', settings.username]
+      ).catch(() => {});
     }
   }
 
   private static async handleEmail(message: any, settings: any): Promise<'CREATED' | 'APPENDED' | null> {
     const parsed = await simpleParser(message.source);
-    const subject = parsed.subject || 'No Subject';
+    const rawSubject = parsed.subject || 'No Subject';
+    const subject = sanitizeHtml(rawSubject, { allowedTags: [], allowedAttributes: {} });
     const sender = parsed.from?.text || 'unknown@sender.com';
-    const body = parsed.text || parsed.html || '';
+    const rawBody = parsed.text || parsed.html || '';
+    const body = sanitizeHtml(rawBody, sanitizeOptions);
     const receivedAt = parsed.date || new Date();
     const messageId = parsed.messageId?.trim() || crypto
       .createHash('sha256')
@@ -177,11 +205,11 @@ export class EmailIngestionService {
 
     let status: 'CREATED' | 'APPENDED' | null = null;
     if (existingIncidentId) {
-      await this.appendToIncident(existingIncidentId, parsed, messageId);
+      await this.appendToIncident(existingIncidentId, parsed, messageId, subject, body);
       status = 'APPENDED';
     } else {
       // 3. New Incident Creation
-      await this.createNewIncident(parsed, messageId, subjectHash);
+      await this.createNewIncident(parsed, messageId, subjectHash, subject, body);
       status = 'CREATED';
     }
 
@@ -194,13 +222,12 @@ export class EmailIngestionService {
     return status;
   }
 
-  private static async appendToIncident(incidentId: string, parsed: any, messageId: string) {
+  private static async appendToIncident(incidentId: string, parsed: any, messageId: string, subject: string, body: string) {
     const sender = parsed.from?.text || 'unknown';
-    const body = parsed.text || '';
     
     await pool.query(
       'INSERT INTO email_logs (message_id, sender, subject, processed_status, incident_id) VALUES ($1, $2, $3, $4, $5)',
-      [messageId, sender, parsed.subject, 'APPENDED', incidentId]
+      [messageId, sender, subject, 'APPENDED', incidentId]
     );
 
     // Update incident timeline or add a note (here we just log)
@@ -215,9 +242,7 @@ export class EmailIngestionService {
     await this.handleAttachments(incidentId, parsed);
   }
 
-  private static async createNewIncident(parsed: any, messageId: string, subjectHash: string) {
-    const subject = parsed.subject || 'No Subject';
-    const body = parsed.text || parsed.html || '';
+  private static async createNewIncident(parsed: any, messageId: string, subjectHash: string, subject: string, body: string) {
     const sender = parsed.from?.text || 'unknown';
     const id = uuidv4();
     const ticketNumber = await this.generateUniqueTicketNumber();
@@ -313,6 +338,23 @@ export class EmailIngestionService {
 
     await this.handleAttachments(id, parsed);
     await this.triggerNotifications({ ...incidentData, ai_insights: aiInsights }, assignment);
+
+    // Persistent database notification
+    if (incidentData.assignedToUserId) {
+      await pool.query(
+        'INSERT INTO notifications (user_id, title, message, type, link) VALUES ($1, $2, $3, $4, $5)',
+        [
+          incidentData.assignedToUserId,
+          `New Email Incident (${incidentData.severity.toUpperCase()})`,
+          `${ticketNumber}: ${incidentData.alertName}`,
+          incidentData.severity === 'critical' ? 'error' : (incidentData.severity === 'high' ? 'warning' : 'info'),
+          `/incidents?id=${id}`
+        ]
+      );
+    }
+
+    // Refresh stats view
+    pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats_mv').catch(err => console.error('[ERR] MV Refresh failed:', err.message));
   }
 
   private static parseDetailedMetadata(body: string, subject: string) {

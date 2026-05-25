@@ -58,7 +58,7 @@ export const settingsController = {
         undefined,
         undefined,
         `Updated mailbox ID: ${id}, user: ${username || 'N/A'}`,
-        'system' // In a real app, use req.user.id
+        (req as any).user?.id || 'system'
       );
 
       res.json({ success: true });
@@ -82,7 +82,7 @@ export const settingsController = {
         undefined,
         undefined,
         `Created mailbox for: ${username}`,
-        req.headers['x-user-id'] as string
+        (req as any).user?.id || 'system'
       );
 
       res.status(201).json({ id: result.rows[0].id });
@@ -115,7 +115,7 @@ export const settingsController = {
         undefined,
         undefined,
         `Set feature ${name} to ${isEnabled}`,
-        req.headers['x-user-id'] as string
+        (req as any).user?.id || 'system'
       );
 
       res.json({ success: true });

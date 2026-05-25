@@ -58,23 +58,91 @@ export async function sendNotification(
   recipientEmail?: string
 ) {
   try {
-    const emailData = buildNotificationEmail(incident, type);
     const transporter = await getTransporter();
     const recipient = recipientEmail || process.env.DEFAULT_ALERT_RECIPIENT || 'kamleshgawade786@gmail.com';
 
-    console.log(`[NOTIFY] Sending ${type} email to ${recipient}: ${emailData.subject}`);
+    // 1. Try to fetch from database templates
+    const templateId = type === 'alert' ? 'incident_alert' : (type === 'daily_digest' ? 'daily_digest' : 'incident_reminder');
+    const templateRes = await pool.query('SELECT * FROM email_templates WHERE id = $1', [templateId]);
+    
+    let subject: string;
+    let body: string;
+
+    if (templateRes.rows.length > 0) {
+      const template = templateRes.rows[0];
+      subject = replacePlaceholders(template.subject, incident);
+      body = replacePlaceholders(template.body, incident);
+    } else {
+      // Fallback to legacy hardcoded builder
+      const emailData = buildNotificationEmail(incident, type);
+      subject = emailData.subject;
+      body = emailData.body;
+    }
+
+    console.log(`[NOTIFY] Sending ${type} email to ${recipient}: ${subject}`);
 
     await transporter.sendMail({
       from: `"GuardianSOC Engine" <${transporter.options.auth?.user}>`,
       to: recipient,
-      subject: emailData.subject,
-      html: emailData.body,
+      subject: subject,
+      html: body,
     });
 
     return true;
   } catch (err: any) {
     console.error('[NOTIFY] Email delivery failed:', err.message);
     return false;
+  }
+}
+
+function replacePlaceholders(text: string, incident: any): string {
+  const data = {
+    ...incident,
+    appUrl: FRONTEND_URL,
+    incidentId: incident.id,
+    ticketNumber: incident.ticketNumber,
+    alertName: incident.alertName,
+    severity: incident.severity?.toUpperCase(),
+    host: incident.host,
+    description: incident.description || 'No description provided.',
+    detectionTime: new Date(incident.detectionTime).toLocaleString(),
+    slaDeadline: new Date(incident.slaDeadline).toLocaleString()
+  };
+
+  return text.replace(/{{(\w+)}}/g, (match, key) => {
+    return data[key] !== undefined ? String(data[key]) : match;
+  });
+}
+
+export async function sendReply(
+  incident: any,
+  replyBody: string,
+  recipientEmail: string,
+  originalMessageId?: string
+) {
+  try {
+    const transporter = await getTransporter();
+    const sender = transporter.options.auth?.user;
+
+    console.log(`[NOTIFY] Sending reply to ${recipientEmail} for ticket ${incident.ticketNumber}`);
+
+    const mailOptions: any = {
+      from: `"GuardianSOC Security Team" <${sender}>`,
+      to: recipientEmail,
+      subject: `Re: [${incident.ticketNumber}] ${incident.alertName}`,
+      text: replyBody,
+    };
+
+    if (originalMessageId) {
+      mailOptions.inReplyTo = originalMessageId;
+      mailOptions.references = [originalMessageId];
+    }
+
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (err: any) {
+    console.error('[NOTIFY] Reply delivery failed:', err.message);
+    throw err;
   }
 }
 

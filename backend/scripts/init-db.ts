@@ -178,6 +178,39 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     timestamp BIGINT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    title TEXT NOT NULL,
+    message TEXT,
+    type TEXT DEFAULT 'info',
+    read BOOLEAN DEFAULT FALSE,
+    link TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS dashboard_stats_mv AS
+SELECT 
+  COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'open') as open_count,
+  COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'investigating') as investigating_count,
+  COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'closed') as closed_count,
+  
+  COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'critical' AND TRIM(status) NOT ILIKE 'closed') as critical_open,
+  COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'high' AND TRIM(status) NOT ILIKE 'closed') as high_open,
+  COUNT(*) FILTER (WHERE (TRIM(severity) ILIKE 'medium' OR TRIM(severity) ILIKE 'TEST') AND TRIM(status) NOT ILIKE 'closed') as medium_open,
+  COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'low' AND TRIM(status) NOT ILIKE 'closed') as low_open,
+  
+  COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'critical' AND TRIM(status) ILIKE 'closed') as critical_closed,
+  COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'high' AND TRIM(status) ILIKE 'closed') as high_closed,
+  COUNT(*) FILTER (WHERE (TRIM(severity) ILIKE 'medium' OR TRIM(severity) ILIKE 'TEST') AND TRIM(status) ILIKE 'closed') as medium_closed,
+  COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'low' AND TRIM(status) ILIKE 'closed') as low_closed,
+  
+  COUNT(*) FILTER (WHERE TRIM(status) NOT ILIKE 'closed') as active_threats,
+  COUNT(*) as total_count
+FROM incidents;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dashboard_stats_mv_total ON dashboard_stats_mv (total_count);
+
 -- Insert a default admin user if not exists
 INSERT INTO roles (id, name, permissions, description)
 VALUES ('admin', 'Administrator', ARRAY['all'], 'Full system access')

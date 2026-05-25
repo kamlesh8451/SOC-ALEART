@@ -5,7 +5,7 @@ import {
   Ticket, Search, Filter, ArrowUpDown, 
   MoreHorizontal, Eye, Edit2, Trash2,
   AlertTriangle, Clock, CheckCircle, Shield, ChevronLeft,
-  Download, Upload, GitMerge
+  Download, Upload, GitMerge, Loader2
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,16 +19,35 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '@/lib/AuthContext';
 
+import { FilterBar, FilterState } from './FilterBar';
+
 export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> = ({ initialIncidentId }) => {
   const { user } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'closed' | 'investigating'>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
   const isAdmin = user?.role === 'admin';
+
+  const constructQuery = (f: FilterState) => {
+    const parts = [];
+    if (f.search) parts.push(f.search);
+    if (f.severity.length > 0) parts.push(`severity:${f.severity.join(',')}`);
+    if (f.status.length > 0) parts.push(`status:${f.status.join(',')}`);
+    if (f.host) parts.push(`host:${f.host}`);
+    if (f.assignedTo) parts.push(`assignedTo:${f.assignedTo}`);
+    return parts.join(' ');
+  };
+
+  const handleFilterChange = (f: FilterState) => {
+    const query = constructQuery(f);
+    setSearch(query);
+  };
 
   useEffect(() => {
     if (initialIncidentId) {
@@ -37,15 +56,57 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
   }, [initialIncidentId]);
 
   useEffect(() => {
-    const unsub = incidentService.subscribeToIncidents((data) => {
-      setIncidents(data);
-      setLoading(false);
+    // If query is structured (contains colon) or not empty, hit the server
+    const isComplex = search.includes(':') || search.length > 2;
+    
+    if (isComplex) {
+      const timer = setTimeout(async () => {
+        setIsSearchingServer(true);
+        try {
+          const data = await incidentService.search(search);
+          setIncidents(Array.isArray(data) ? data : []);
+          // When searching, we might not have full pagination from search endpoint
+          setPagination({ total: data.length, page: 1, limit: 50, totalPages: 1 });
+        } catch (err) {
+          console.error("Structured search failed");
+        } finally {
+          setIsSearchingServer(false);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    } else if (search === '') {
+      // Refresh default list if search cleared
+      incidentService.getIncidents(pagination?.page || 1, pagination?.limit || 50).then(res => {
+        if (res && res.data && res.pagination) {
+          setIncidents(res.data);
+          setPagination(res.pagination);
+        } else if (Array.isArray(res)) {
+          setIncidents(res);
+          setPagination({ total: res.length, page: 1, limit: 50, totalPages: 1 });
+        }
+      });
+    }
+  }, [search, pagination?.page]);
+
+  useEffect(() => {
+    const unsub = incidentService.subscribeToIncidents((res) => {
+      // Only update if not currently searching with structure
+      if (!search.includes(':')) {
+        if (res && res.data && res.pagination) {
+          setIncidents(res.data);
+          setPagination(res.pagination);
+        } else if (Array.isArray(res)) {
+          setIncidents(res);
+          setPagination({ total: res.length, page: 1, limit: 50, totalPages: 1 });
+        }
+        setLoading(false);
+      }
     }, (err) => {
       toast.error("Telemetry failed: Cannot sync incident stream");
       setLoading(false);
-    });
+    }, pagination?.page || 1, pagination?.limit || 50);
     return unsub;
-  }, []);
+  }, [search, pagination?.page]);
 
   const handleBulkClose = async () => {
     if (!isAdmin || selectedIds.length === 0) return;
@@ -63,7 +124,7 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
 
   const handleBulkDelete = async () => {
    if (!isAdmin || selectedIds.length === 0) return;
-   if (!confirm(`WARNIING: Permanently purge ${selectedIds.length} records from registry?`)) return;
+   if (!confirm(`WARNING: Permanently purge ${selectedIds.length} records from registry?`)) return;
    try {
      toast.loading(`Sanitizing registry...`);
      await incidentService.bulkDelete(selectedIds);
@@ -155,7 +216,7 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
         <Button 
           variant="ghost" 
           onClick={() => setSelectedIncidentId(null)}
-          className="text-cyan-500 hover:text-cyan-400 hover:bg-cyan-500/10 gap-2 uppercase font-bold text-[10px]"
+          className="text-primary hover:text-primary/80 hover:bg-primary/10 gap-2 uppercase font-bold text-[10px]"
         >
           <ChevronLeft size={14} /> Back to Registry
         </Button>
@@ -166,7 +227,7 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
             onSelectIncident={(inc) => setSelectedIncidentId(inc.id)}
           />
         ) : (
-          <div className="p-20 text-center text-cyan-500/20 font-mono uppercase">Ticket not found in active memory</div>
+          <div className="p-20 text-center text-primary/20 font-mono uppercase">Ticket not found in active memory</div>
         )}
       </div>
     );
@@ -181,33 +242,10 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-           <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500/40" />
-              <Input 
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="SEARCH REGISTRY..." 
-                className="bg-cyan-500/5 border-cyan-500/10 pl-10 h-11 text-xs uppercase tracking-widest w-[300px] text-white"
-              />
-           </div>
-           <div className="flex bg-secondary p-1 rounded-md border border-border">
-              {(['all', 'open', 'investigating', 'closed'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={cn(
-                    "px-3 py-1.5 text-[10px] font-bold uppercase tracking-tighter rounded transition-all",
-                    filter === f ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {f}
-                </button>
-              ))}
-           </div>
-        </div>
+    <div className="space-y-6 pb-10">
+      <FilterBar onFilterChange={handleFilterChange} />
+      
+      <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
         <div className="flex items-center gap-2">
           <Button 
             variant="outline"
@@ -225,7 +263,7 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
           <Button 
             variant="outline"
             onClick={handleExport}
-            className="border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
+            className="border-primary/20 text-primary hover:bg-primary/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
           >
             <Download className="w-4 h-4 mr-2" />
             Export
@@ -233,14 +271,14 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
           <Button 
             variant="outline"
             onClick={handleImport}
-            className="border-cyan-500/20 text-cyan-500 hover:bg-cyan-500/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
+            className="border-primary/20 text-primary hover:bg-primary/10 font-bold uppercase tracking-widest text-[10px] h-11 px-4"
           >
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>
           <Button 
             onClick={() => setIsCreateOpen(true)}
-            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase tracking-widest text-[10px] h-11 px-6 shadow-lg shadow-cyan-600/20"
+            className="bg-primary hover:opacity-90 text-white font-bold uppercase tracking-widest text-[10px] h-11 px-6 shadow-lg shadow-primary/20 border-none"
           >
             <Ticket className="w-4 h-4 mr-2" />
             Inject
@@ -265,14 +303,14 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
                {mergingParentId === 'SELECTING' ? (
                  <Button 
                    onClick={() => setMergingParentId(null)}
-                   className="bg-amber-500 hover:bg-amber-600 text-black font-bold uppercase tracking-widest text-[9px] h-8 px-4 animate-pulse"
+                   className="bg-warning hover:opacity-90 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4 animate-pulse border-none"
                  >
                    Cancel Merge
                  </Button>
                ) : (
                  <Button 
                    onClick={handleMerge}
-                   className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4"
+                   className="bg-primary hover:opacity-90 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4 border-none"
                  >
                    <GitMerge className="w-3 h-3 mr-2" />
                    Merge
@@ -280,7 +318,7 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
                )}
                <Button 
                  onClick={handleBulkClose}
-                 className="bg-green-500 hover:bg-green-600 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4"
+                 className="bg-success hover:opacity-90 text-white font-bold uppercase tracking-widest text-[9px] h-8 px-4 border-none"
                >
                  <CheckCircle className="w-3 h-3 mr-2" />
                  Bulk Close
@@ -288,7 +326,7 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
                <Button 
                  onClick={handleBulkDelete}
                  variant="destructive"
-                 className="font-bold uppercase tracking-widest text-[9px] h-8 px-4"
+                 className="font-bold uppercase tracking-widest text-[9px] h-8 px-4 shadow-sm"
                >
                  <Trash2 className="w-3 h-3 mr-2" />
                  Bulk Purge
@@ -296,7 +334,7 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
                <Button 
                  variant="ghost" 
                  onClick={() => setSelectedIds([])}
-                 className="text-muted-foreground hover:text-white text-[9px] font-bold uppercase h-8"
+                 className="text-muted-foreground hover:text-foreground text-[9px] font-bold uppercase h-8"
                >
                  Deselect
                </Button>
@@ -305,44 +343,44 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
         )}
       </AnimatePresence>
 
-      <Card className="bg-black/40 border-cyan-500/10 backdrop-blur-xl">
+      <Card className="bg-card border-border shadow-sm overflow-hidden">
         <CardContent className="p-0">
-          <div className="overflow-x-auto text-white">
+          <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-cyan-500/10 text-[10px] uppercase text-cyan-500/50 font-bold tracking-widest">
+                <tr className="border-b border-border text-[10px] uppercase text-muted-foreground font-bold tracking-widest bg-secondary/30">
                   {isAdmin && (
                     <th className="p-5 w-10">
                       <input 
                         type="checkbox" 
                         checked={selectedIds.length === filteredIncidents.length && filteredIncidents.length > 0}
                         onChange={toggleSelectAll}
-                        className="rounded border-cyan-500/20 bg-transparent text-primary"
+                        className="rounded border-border bg-background text-primary"
                       />
                     </th>
                   )}
-                  <th className="p-5 font-bold">Ticket ID</th>
-                  <th className="p-5 font-bold">Incident Core</th>
-                  <th className="p-5 font-bold">Severity</th>
-                  <th className="p-5 font-bold">Host/Node</th>
-                  <th className="p-5 font-bold">Detection</th>
-                  <th className="p-5 font-bold">SLA status</th>
-                  <th className="p-5 font-bold">Protocol</th>
+                  <th className="p-5 font-black">Ticket ID</th>
+                  <th className="p-5 font-black">Incident Core</th>
+                  <th className="p-5 font-black">Severity</th>
+                  <th className="p-5 font-black">Host/Node</th>
+                  <th className="p-5 font-black">Detection</th>
+                  <th className="p-5 font-black">SLA Status</th>
+                  <th className="p-5 font-black">Protocol</th>
                   <th className="p-5"></th>
                 </tr>
               </thead>
-              <tbody className="text-xs">
+              <tbody className="text-xs text-foreground/90">
                 {loading ? (
                   Array(5).fill(0).map((_, i) => (
-                    <tr key={i} className="animate-pulse border-b border-cyan-500/5">
-                      <td colSpan={isAdmin ? 9 : 8} className="p-5 h-16 bg-cyan-500/5" />
+                    <tr key={i} className="animate-pulse border-b border-border/50">
+                      <td colSpan={isAdmin ? 9 : 8} className="p-5 h-16 bg-secondary/20" />
                     </tr>
                   ))
                 ) : filteredIncidents.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 9 : 8} className="p-20 text-center">
-                       <Shield className="w-12 h-12 text-cyan-500/10 mx-auto mb-4" />
-                       <p className="text-cyan-500/40 font-mono text-xs uppercase tracking-widest">No matching records found in secure registry</p>
+                    <td colSpan={isAdmin ? 9 : 8} className="p-20 text-center opacity-30">
+                       <Shield className="w-12 h-12 text-primary mx-auto mb-4" />
+                       <p className="text-primary font-mono text-xs uppercase tracking-widest">No matching records found in secure registry</p>
                     </td>
                   </tr>
                 ) : filteredIncidents.map((inc) => (
@@ -363,6 +401,36 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between p-4 border-t border-border bg-secondary/10">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Showing {(((pagination?.page || 1) - 1) * (pagination?.limit || 50)) + 1} - {Math.min((pagination?.page || 1) * (pagination?.limit || 50), pagination?.total || 0)} of {pagination?.total || 0} records
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={(pagination?.page || 1) <= 1}
+                onClick={() => setPagination(prev => ({ ...prev, page: (prev?.page || 1) - 1 }))}
+                className="h-8 text-[10px] font-bold uppercase border-border hover:bg-primary/10"
+              >
+                Previous
+              </Button>
+              <div className="text-[10px] font-bold uppercase tracking-tighter w-20 text-center">
+                Page {pagination?.page || 1} / {pagination?.totalPages || 1}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={(pagination?.page || 1) >= (pagination?.totalPages || 1)}
+                onClick={() => setPagination(prev => ({ ...prev, page: (prev?.page || 1) + 1 }))}
+                className="h-8 text-[10px] font-bold uppercase border-border hover:bg-primary/10"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -370,6 +438,8 @@ export const IncidentsListView: React.FC<{ initialIncidentId?: string | null }> 
     </div>
   );
 };
+
+import { SLACountdown } from './SLACountdown';
 
 const IncidentRow = ({ inc, onView, isAdmin, isSelected, isMerging, onSelect, onFinalizeMerge }: { 
   inc: Incident, 
@@ -380,14 +450,12 @@ const IncidentRow = ({ inc, onView, isAdmin, isSelected, isMerging, onSelect, on
   onSelect?: (checked: boolean) => void,
   onFinalizeMerge?: () => void
 }) => {
-  const isBreached = Date.now() > inc.slaDeadline && inc.status !== 'closed';
-
   return (
     <tr 
       onClick={onView}
       className={cn(
-        "border-b border-cyan-500/5 hover:bg-cyan-500/5 transition-colors group cursor-pointer",
-        isSelected && "bg-primary/5"
+        "border-b border-border/40 hover:bg-primary/[0.03] transition-colors group cursor-pointer",
+        isSelected && "bg-primary/[0.05]"
       )}
     >
       {isAdmin && (
@@ -396,58 +464,47 @@ const IncidentRow = ({ inc, onView, isAdmin, isSelected, isMerging, onSelect, on
             type="checkbox" 
             checked={isSelected}
             onChange={(e) => onSelect?.(e.target.checked)}
-            className="rounded border-cyan-500/20 bg-transparent text-primary"
+            className="rounded border-border bg-background text-primary"
           />
         </td>
       )}
-      <td className="p-5 font-mono text-[10px] text-cyan-500 font-bold tracking-tighter">{inc.ticketNumber}</td>
+      <td className="p-5 font-mono text-[11px] text-primary font-bold tracking-tighter uppercase">{inc.ticketNumber}</td>
       <td className="p-5">
         <div className="flex flex-col">
-          <span className="font-bold text-white/90 truncate max-w-[250px] uppercase">{inc.alertName}</span>
-          <span className="text-[9px] text-cyan-500/30 font-mono">{inc.id.slice(0, 8)}</span>
+          <span className="font-bold text-foreground/90 truncate max-w-[250px] uppercase tracking-tight">{inc.alertName}</span>
+          <span className="text-[9px] text-muted-foreground/40 font-mono">{inc.id.slice(0, 8)}</span>
         </div>
       </td>
       <td className="p-5">
         <Badge className={cn(
-          "text-[9px] uppercase font-black px-2 py-0.5 rounded-full border-none",
-          inc.severity === 'critical' ? 'bg-red-500/10 text-red-500' : 
-          inc.severity === 'high' ? 'bg-orange-500/10 text-orange-500' : 
-          'bg-yellow-500/10 text-yellow-500'
+          "text-[9px] uppercase font-black px-2 py-0.5 rounded-full border-none shadow-sm",
+          inc.severity === 'critical' ? 'bg-error text-white' : 
+          inc.severity === 'high' ? 'bg-warning text-white' : 
+          'bg-secondary text-muted-foreground'
         )}>
           {inc.severity}
         </Badge>
       </td>
       <td className="p-5">
         <div className="flex items-center gap-2">
-           <div className="w-1.5 h-1.5 rounded-full bg-cyan-500/30" />
-           <span className="font-mono text-[10px] text-white/60 lowercase">{inc.host}</span>
+           <div className="w-1.5 h-1.5 rounded-full bg-primary/30" />
+           <span className="font-mono text-[10px] text-muted-foreground lowercase">{inc.host}</span>
         </div>
       </td>
-      <td className="p-5 text-white/40 font-mono text-[10px]">
+      <td className="p-5 text-muted-foreground/60 font-mono text-[10px]">
         {new Date(inc.detectionTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
       </td>
       <td className="p-5">
-        <div className="flex items-center gap-2">
-           {isBreached ? (
-             <AlertTriangle size={12} className="text-red-500 animate-pulse" />
-           ) : (
-             <Clock size={12} className="text-cyan-500/40" />
-           )}
-           <span className={cn(
-             "font-mono text-[10px] font-bold",
-             isBreached ? "text-red-500" : "text-cyan-400"
-           )}>
-             {isBreached ? "BREACHED" : "NOMINAL"}
-           </span>
-        </div>
+        <SLACountdown deadline={inc.slaDeadline} className="text-[10px]" />
       </td>
       <td className="p-5">
         <div className="flex items-center gap-1.5">
            <div className={cn(
-             "w-1.5 h-1.5 rounded-full animate-pulse",
-             inc.status === 'open' ? 'bg-blue-500' : inc.status === 'closed' ? 'bg-green-500' : 'bg-orange-500'
+             "w-1.5 h-1.5 rounded-full",
+             inc.status === 'open' ? "bg-primary animate-pulse shadow-[0_0_8px_var(--primary-glow)]" : 
+             inc.status === 'closed' ? "bg-success" : "bg-warning"
            )} />
-           <span className="text-[10px] font-bold uppercase text-cyan-500/70">{inc.status}</span>
+           <span className="text-[10px] font-black uppercase text-muted-foreground">{inc.status}</span>
         </div>
       </td>
       <td className="p-5 text-right">
@@ -458,16 +515,16 @@ const IncidentRow = ({ inc, onView, isAdmin, isSelected, isMerging, onSelect, on
                   e.stopPropagation();
                   onFinalizeMerge?.();
                 }}
-                className="h-8 bg-cyan-500 hover:bg-cyan-600 text-white font-bold uppercase text-[9px]"
+                className="h-8 bg-primary hover:opacity-90 text-white font-black uppercase text-[9px] border-none"
               >
-                Select as Parent
+                Set Parent
               </Button>
             ) : (
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"
+                  className="h-8 w-8 text-primary/60 hover:text-primary hover:bg-primary/10"
                   onClick={async (e) => {
                     e.stopPropagation();
                     try {
@@ -484,7 +541,7 @@ const IncidentRow = ({ inc, onView, isAdmin, isSelected, isMerging, onSelect, on
                 >
                   <Download size={14} />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-500/60 hover:text-cyan-400 hover:bg-cyan-500/10"><Eye size={14} /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary/60 hover:text-primary hover:bg-primary/10"><Eye size={14} /></Button>
               </div>
             )}
          </div>

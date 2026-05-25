@@ -25,10 +25,14 @@ export const adminService = {
     });
   },
 
+  async getUsers() {
+    return apiJson<UserProfile[]>("/api/users");
+  },
+
   subscribeToUsers(callback: (users: UserProfile[]) => void) {
     const fetchUsers = async () => {
       try {
-        const data = await apiJson<UserProfile[]>("/api/users");
+        const data = await this.getUsers();
         callback(data);
       } catch (error) {
         console.error("Failed to fetch users:", error);
@@ -41,6 +45,10 @@ export const adminService = {
   },
 
   // Role Management
+  async getRoles() {
+    return apiJson<RoleDefinition[]>("/api/roles");
+  },
+
   async createRole(data: Omit<RoleDefinition, "id">) {
     return apiJson("/api/roles", {
       method: "POST",
@@ -66,7 +74,7 @@ export const adminService = {
   subscribeToRoles(callback: (roles: RoleDefinition[]) => void) {
     const fetchRoles = async () => {
       try {
-        const data = await apiJson<RoleDefinition[]>("/api/roles");
+        const data = await this.getRoles();
         callback(data);
       } catch (error) {
         console.error("Failed to fetch roles:", error);
@@ -79,6 +87,10 @@ export const adminService = {
   },
 
   // Assignment Rules Management
+  async getRules() {
+    return apiJson<AssignmentRule[]>("/api/rules");
+  },
+
   async createRule(data: Omit<AssignmentRule, "id">) {
     return apiJson("/api/rules", {
       method: "POST",
@@ -104,7 +116,7 @@ export const adminService = {
   subscribeToRules(callback: (rules: AssignmentRule[]) => void) {
     const fetchRules = async () => {
       try {
-        const data = await apiJson<AssignmentRule[]>("/api/rules");
+        const data = await this.getRules();
         callback(data);
       } catch (error) {
         console.error("Failed to fetch rules:", error);
@@ -132,7 +144,7 @@ export const adminService = {
   // Logic to find assignment for an incident
   async getAssignmentForIncident(alertName: string, description: string): Promise<{ id: string, name: string } | null> {
     try {
-      const rules = await apiJson<AssignmentRule[]>("/api/rules");
+      const rules = await this.getRules();
       
       // Sort by priority descending (default 0 if not set)
       const activeRules = rules.filter(r => r.active);
@@ -175,7 +187,7 @@ export const adminService = {
     return apiJson<any[]>('/api/auth/sessions');
   },
 
-  async revokeSession(id: string) {
+  async terminateSession(id: string) {
     return apiJson(`/api/auth/sessions/${id}`, {
       method: 'DELETE'
     });

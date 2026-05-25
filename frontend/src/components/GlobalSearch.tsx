@@ -14,6 +14,7 @@ export function GlobalSearch({ onSelectIncident }: { onSelectIncident: (id: stri
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const timer = setTimeout(async () => {
       if (query.length < 2) {
         setResults([]);
@@ -22,15 +23,18 @@ export function GlobalSearch({ onSelectIncident }: { onSelectIncident: (id: stri
       setLoading(true);
       try {
         const data = await incidentService.search(query);
-        setResults(data);
+        if (isMounted) setResults(data);
       } catch (e) {
         console.error("Search failed");
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, [query]);
 
   useEffect(() => {
@@ -48,7 +52,7 @@ export function GlobalSearch({ onSelectIncident }: { onSelectIncident: (id: stri
       <div className="relative group">
         <Search size={16} className={cn(
           "absolute left-3 top-1/2 -translate-y-1/2 transition-colors",
-          isOpen ? "text-cyan-400" : "text-cyan-500/40"
+          isOpen ? "text-primary" : "text-muted-foreground/40"
         )} />
         <input 
           value={query}
@@ -57,7 +61,7 @@ export function GlobalSearch({ onSelectIncident }: { onSelectIncident: (id: stri
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="bg-cyan-500/5 border border-cyan-500/10 rounded-full pl-10 pr-10 py-2 text-xs focus:border-cyan-500/40 transition-all outline-none w-64 text-white placeholder:text-cyan-500/20 font-mono tracking-wider" 
+          className="bg-secondary/50 border border-border rounded-full pl-10 pr-10 py-2 text-xs focus:border-primary/40 transition-all outline-none w-64 text-foreground placeholder:opacity-20 font-mono tracking-wider" 
           placeholder="QUERY THREAT DATABASE..." 
         />
         {query && (
@@ -66,7 +70,7 @@ export function GlobalSearch({ onSelectIncident }: { onSelectIncident: (id: stri
               setQuery('');
               setResults([]);
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-cyan-500/40 hover:text-white transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors"
           >
             <X size={14} />
           </button>
@@ -79,16 +83,16 @@ export function GlobalSearch({ onSelectIncident }: { onSelectIncident: (id: stri
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="absolute top-full right-0 mt-2 w-96 bg-[#0a0a0a] border border-cyan-500/20 rounded-xl shadow-2xl z-[500] overflow-hidden backdrop-blur-xl"
+            className="absolute top-full right-0 mt-2 w-96 bg-card border border-border rounded-xl shadow-2xl z-[500] overflow-hidden backdrop-blur-xl"
           >
-            <div className="p-3 border-b border-cyan-500/10 bg-cyan-500/5 flex items-center justify-between">
-              <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500/60 flex items-center gap-2">
-                 <Shield size={10} /> Search Intelligence
+            <div className="p-3 border-b border-border bg-secondary/30 flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                 <Shield size={10} className="text-primary" /> Search Intelligence
               </span>
-              {loading && <Loader2 size={10} className="text-cyan-500 animate-spin" />}
+              {loading && <Loader2 size={10} className="text-primary animate-spin" />}
             </div>
 
-            <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-500/20">
+            <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20">
               {results.length > 0 ? (
                 results.map((inc) => (
                   <div 
@@ -97,34 +101,34 @@ export function GlobalSearch({ onSelectIncident }: { onSelectIncident: (id: stri
                       onSelectIncident(inc.id);
                       setIsOpen(false);
                     }}
-                    className="p-3 border-b border-cyan-500/5 hover:bg-cyan-500/10 cursor-pointer transition-all flex items-start gap-3 group"
+                    className="p-3 border-b border-border/50 hover:bg-primary/5 cursor-pointer transition-all flex items-start gap-3 group"
                   >
                     <div className={cn(
                       "mt-1 w-2 h-2 rounded-full shrink-0",
-                      inc.severity === 'critical' ? 'bg-red-500' : 
-                      inc.severity === 'high' ? 'bg-orange-500' : 'bg-blue-500'
+                      inc.severity === 'critical' ? 'bg-error' : 
+                      inc.severity === 'high' ? 'bg-warning' : 'bg-primary'
                     )} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-mono font-bold text-cyan-400 group-hover:text-cyan-300">{inc.ticketNumber}</span>
-                        <Badge className="bg-transparent border-cyan-500/20 text-[7px] h-3.5 px-1 uppercase">{inc.status}</Badge>
+                        <span className="text-[10px] font-mono font-bold text-primary group-hover:opacity-80 transition-opacity uppercase tracking-tighter">{inc.ticketNumber}</span>
+                        <Badge variant="outline" className="border-border text-[7px] h-3.5 px-1 uppercase text-muted-foreground font-black tracking-widest">{inc.status}</Badge>
                       </div>
-                      <p className="text-[11px] font-bold text-white/90 truncate uppercase tracking-tight">{inc.alertName}</p>
-                      <p className="text-[9px] text-cyan-500/40 font-mono mt-0.5 lowercase">{inc.host}</p>
+                      <p className="text-[11px] font-bold text-foreground truncate uppercase tracking-tight">{inc.alertName}</p>
+                      <p className="text-[9px] text-muted-foreground font-mono mt-0.5 lowercase">{inc.host}</p>
                     </div>
                   </div>
                 ))
               ) : !loading ? (
-                <div className="p-10 text-center space-y-2">
-                   <AlertTriangle className="w-8 h-8 text-cyan-500/20 mx-auto" />
-                   <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-500/40">No Signal Detected</p>
+                <div className="p-10 text-center space-y-2 opacity-30">
+                   <AlertTriangle className="w-8 h-8 text-primary mx-auto" />
+                   <p className="text-[10px] font-bold uppercase tracking-widest text-primary">No Signal Detected</p>
                 </div>
               ) : null}
             </div>
 
             {results.length > 0 && (
-              <div className="p-2 bg-black/40 text-center">
-                 <p className="text-[8px] text-cyan-500/30 uppercase font-black tracking-[0.2em]">End of results</p>
+              <div className="p-2 bg-secondary/50 text-center">
+                 <p className="text-[8px] text-muted-foreground uppercase font-black tracking-[0.2em]">End of results</p>
               </div>
             )}
           </motion.div>

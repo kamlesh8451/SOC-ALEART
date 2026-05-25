@@ -89,8 +89,10 @@ export const incidentService = {
 
   // Real-time listener (simulated with polling)
   subscribeToIncidents(
-    callback: (incidents: Incident[]) => void,
-    onError?: (error: Error) => void
+    callback: (data: { data: Incident[]; pagination: any }) => void,
+    onError?: (error: Error) => void,
+    page = 1,
+    limit = 50
   ) {
     let cancelled = false;
     let delayMs = 5000;
@@ -99,7 +101,7 @@ export const incidentService = {
     const poll = async () => {
       if (cancelled) return;
       try {
-        const data = await apiJson<Incident[]>("/api/incidents");
+        const data = await apiJson<{ data: Incident[]; pagination: any }>(`/api/incidents?page=${page}&limit=${limit}`);
         delayMs = 5000;
         errorNotified = false;
         callback(data);
@@ -212,8 +214,8 @@ export const incidentService = {
   },
 
   // Fetch current incident registry
-  async getIncidents() {
-    return apiJson<Incident[]>("/api/incidents");
+  async getIncidents(page = 1, limit = 50) {
+    return apiJson<{ data: Incident[]; pagination: any }>(`/api/incidents?page=${page}&limit=${limit}`);
   },
 
   async search(query: string) {

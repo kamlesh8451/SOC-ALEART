@@ -17,6 +17,7 @@ import {
 import { adminService } from '@/services/adminService';
 import { toast } from 'sonner';
 import { AssignmentRule } from '../types';
+import { cn } from '@/lib/utils';
 
 export const RoutingRulesView: React.FC = () => {
   const [rules, setRules] = useState<any[]>([]);
@@ -115,15 +116,15 @@ export const RoutingRulesView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-end">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 text-foreground">
+      <div className="flex justify-between items-end border-b border-border pb-6">
         <div>
-          <h2 className="text-2xl font-black uppercase tracking-tighter text-white">Routing Rule Engine</h2>
-          <p className="text-cyan-500/50 text-[10px] font-mono uppercase tracking-widest mt-1">Configure automated incident assignment & prioritization</p>
+          <h2 className="text-2xl font-black uppercase tracking-tighter">Routing Rule Engine</h2>
+          <p className="text-primary/50 text-[10px] font-mono uppercase tracking-widest mt-1">Configure automated incident assignment & prioritization</p>
         </div>
         <Button 
           onClick={() => handleOpenDialog()}
-          className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase text-[10px] tracking-widest gap-2 h-9"
+          className="bg-primary hover:opacity-90 text-white font-bold uppercase text-[10px] tracking-widest gap-2 h-9 border-none shadow-lg shadow-primary/10"
         >
           <Plus size={14} /> Create New Rule
         </Button>
@@ -132,51 +133,51 @@ export const RoutingRulesView: React.FC = () => {
       <div className="grid grid-cols-1 gap-4">
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center space-y-4 opacity-50">
-            <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
-            <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-500/40">Synchronizing engine...</p>
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary/40">Synchronizing engine...</p>
           </div>
         ) : rules.map((rule) => (
-          <Card key={rule.id} className="bg-black/40 border-cyan-500/10 backdrop-blur-xl group hover:border-cyan-500/30 transition-all">
+          <Card key={rule.id} className="bg-card border-border group hover:border-primary/30 transition-all shadow-sm overflow-hidden">
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-cyan-500/5 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
                     <Zap size={20} />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
-                       <h3 className="font-bold text-white uppercase tracking-tight">{rule.name || 'Unnamed Rule'}</h3>
-                       <Badge className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20 text-[9px] uppercase font-black">
+                       <h3 className="font-bold uppercase tracking-tight">{rule.name || 'Unnamed Rule'}</h3>
+                       <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] uppercase font-black px-2">
                          {rule.priority} PRIORITY
                        </Badge>
-                       {!rule.active && <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[9px] uppercase font-black">INACTIVE</Badge>}
+                       {!rule.active && <Badge className="bg-error/10 text-error border-error/20 text-[9px] uppercase font-black">INACTIVE</Badge>}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-white/40 uppercase font-mono tracking-tighter">
-                      <Target size={12} className="text-cyan-500/40" />
-                      IF KEYWORD <span className="text-cyan-400 font-bold px-1.5 py-0.5 bg-cyan-500/5 rounded border border-cyan-500/10">"{rule.keyword}"</span> 
-                      USING <span className="text-white/60 font-bold">{rule.matching_strategy}</span> MATCH
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
+                      <Target size={12} className="text-primary/40" />
+                      IF KEYWORD <span className="text-primary font-bold px-1.5 py-0.5 bg-primary/5 rounded border border-primary/10">"{rule.keyword}"</span> 
+                      USING <span className="text-foreground font-bold">{rule.matching_strategy}</span> MATCH
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-6">
                   <div className="text-right space-y-1">
-                    <p className="text-[9px] uppercase font-bold text-cyan-500/40 tracking-widest">ASSIGN DIRECT TO</p>
+                    <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-60">ASSIGN DIRECT TO</p>
                     <div className="flex items-center gap-2 justify-end">
-                       <span className="text-xs font-bold text-white uppercase">{rule.assigned_to_user_name || 'Unassigned'}</span>
-                       <ArrowRight size={12} className="text-cyan-500" />
+                       <span className="text-xs font-bold uppercase">{rule.assigned_to_user_name || 'Unassigned'}</span>
+                       <ArrowRight size={12} className="text-primary" />
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button 
                       onClick={() => handleOpenDialog(rule)}
-                      size="icon" variant="ghost" className="w-8 h-8 rounded-lg border border-cyan-500/10 text-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/10"
+                      size="icon" variant="ghost" className="w-8 h-8 rounded-lg border border-border text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
                     >
                       <Edit2 size={14} />
                     </Button>
                     <Button 
                       onClick={() => handleDelete(rule.id)}
-                      size="icon" variant="ghost" className="w-8 h-8 rounded-lg border border-red-500/10 text-red-500/40 hover:text-red-400 hover:bg-red-500/10"
+                      size="icon" variant="ghost" className="w-8 h-8 rounded-lg border border-error/20 text-muted-foreground hover:text-error hover:bg-error/10 transition-all"
                     >
                       <Trash2 size={14} />
                     </Button>
@@ -184,21 +185,21 @@ export const RoutingRulesView: React.FC = () => {
                 </div>
               </div>
               
-              <div className="mt-6 pt-6 border-t border-cyan-500/5 flex items-center gap-8">
+              <div className="mt-6 pt-6 border-t border-border/50 flex items-center gap-8">
                 <div className="flex items-center gap-2">
-                   <Shield size={12} className="text-cyan-500/40" />
-                   <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">Severity Override:</span>
-                   <span className="text-[10px] font-bold text-white uppercase tracking-tighter">{rule.severity_override || 'None'}</span>
+                   <Shield size={12} className="text-primary/40" />
+                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Severity Override:</span>
+                   <span className="text-[10px] font-bold text-foreground uppercase tracking-tighter">{rule.severity_override || 'None'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                   <Badge className={`w-2 h-2 rounded-full p-0 ${rule.auto_sla_assignment ? 'bg-green-500' : 'bg-white/10'}`} />
-                   <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">Auto-SLA:</span>
-                   <span className="text-[10px] font-bold text-white uppercase tracking-tighter">{rule.auto_sla_assignment ? 'Enabled' : 'Disabled'}</span>
+                   <div className={cn("w-2 h-2 rounded-full", rule.auto_sla_assignment ? 'bg-success shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-muted')} />
+                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Auto-SLA:</span>
+                   <span className="text-[10px] font-bold text-foreground uppercase tracking-tighter">{rule.auto_sla_assignment ? 'Enabled' : 'Disabled'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                   <Badge className={`w-2 h-2 rounded-full p-0 ${rule.send_notifications ? 'bg-cyan-500 shadow-[0_0_4px_rgba(6,182,212,0.8)]' : 'bg-white/10'}`} />
-                   <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">Notifications:</span>
-                   <span className="text-[10px] font-bold text-white uppercase tracking-tighter">{rule.send_notifications ? 'Live' : 'Muted'}</span>
+                   <div className={cn("w-2 h-2 rounded-full", rule.send_notifications ? 'bg-primary shadow-[0_0_8px_var(--primary-glow)]' : 'bg-muted')} />
+                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Notifications:</span>
+                   <span className="text-[10px] font-bold text-foreground uppercase tracking-tighter">{rule.send_notifications ? 'Live' : 'Muted'}</span>
                 </div>
               </div>
             </CardContent>
@@ -206,22 +207,22 @@ export const RoutingRulesView: React.FC = () => {
         ))}
 
         {rules.length === 0 && !loading && (
-          <div className="h-64 rounded-2xl border-2 border-dashed border-cyan-500/10 flex flex-col items-center justify-center space-y-4 opacity-50">
-             <div className="w-12 h-12 rounded-full bg-cyan-500/5 flex items-center justify-center">
-                <Filter size={24} className="text-cyan-500/20" />
+          <div className="h-64 rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center space-y-4 opacity-50 bg-secondary/10">
+             <div className="w-12 h-12 rounded-full bg-secondary/50 flex items-center justify-center">
+                <Filter size={24} className="text-muted-foreground" />
              </div>
-             <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-500/40">No routing rules configured</p>
+             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">No routing rules configured</p>
           </div>
         )}
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-[#050505] border-cyan-500/20 text-white max-w-lg">
+        <DialogContent className="bg-card border-border text-foreground max-w-lg shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase tracking-tighter">
               {currentRule ? 'Edit Tactical Rule' : 'Deploy New Rule'}
             </DialogTitle>
-            <DialogDescription className="text-cyan-500/50 text-[10px] uppercase tracking-widest">
+            <DialogDescription className="text-muted-foreground text-[10px] uppercase tracking-widest font-bold">
               Define matching parameters and automated response actions
             </DialogDescription>
           </DialogHeader>
@@ -229,20 +230,20 @@ export const RoutingRulesView: React.FC = () => {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Rule Designation</Label>
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Rule Designation</Label>
                 <Input 
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="bg-cyan-500/5 border-cyan-500/10 text-xs focus:border-cyan-500/40" 
+                  className="bg-background/50 border-border text-xs focus:border-primary/40" 
                   placeholder="e.g., Ransomware Alert"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Matching Keyword</Label>
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Matching Keyword</Label>
                 <Input 
                   value={formData.keyword}
                   onChange={(e) => setFormData({...formData, keyword: e.target.value})}
-                  className="bg-cyan-500/5 border-cyan-500/10 text-xs focus:border-cyan-500/40" 
+                  className="bg-background/50 border-border text-xs focus:border-primary/40" 
                   placeholder="e.g., cobalt_strike"
                 />
               </div>
@@ -250,15 +251,15 @@ export const RoutingRulesView: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Match Strategy</Label>
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Match Strategy</Label>
                 <Select 
                   value={formData.matchingStrategy || (formData as any).matching_strategy} 
                   onValueChange={(v) => setFormData({...formData, matchingStrategy: v as any})}
                 >
-                  <SelectTrigger className="bg-cyan-500/5 border-cyan-500/10 text-xs">
+                  <SelectTrigger className="bg-background/50 border-border text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0a0a0a] border-cyan-500/20 text-white">
+                  <SelectContent className="bg-card border-border text-foreground">
                     <SelectItem value="contains">Contains</SelectItem>
                     <SelectItem value="exact">Exact Match</SelectItem>
                     <SelectItem value="regex">Regex Pattern</SelectItem>
@@ -266,27 +267,27 @@ export const RoutingRulesView: React.FC = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Priority Weight</Label>
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Priority Weight</Label>
                 <Input 
                   type="number"
                   value={formData.priority}
                   onChange={(e) => setFormData({...formData, priority: parseInt(e.target.value) || 0})}
-                  className="bg-cyan-500/5 border-cyan-500/10 text-xs focus:border-cyan-500/40" 
+                  className="bg-background/50 border-border text-xs focus:border-primary/40" 
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Severity Override</Label>
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Severity Override</Label>
                 <Select 
                   value={formData.severityOverride || (formData as any).severity_override} 
                   onValueChange={(v) => setFormData({...formData, severityOverride: v})}
                 >
-                  <SelectTrigger className="bg-cyan-500/5 border-cyan-500/10 text-xs">
+                  <SelectTrigger className="bg-background/50 border-border text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0a0a0a] border-cyan-500/20 text-white">
+                  <SelectContent className="bg-card border-border text-foreground">
                     <SelectItem value="none">Inherit (Default)</SelectItem>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
@@ -296,28 +297,28 @@ export const RoutingRulesView: React.FC = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] uppercase font-bold text-cyan-500/70">Assign To Analyst</Label>
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Assign To Analyst</Label>
                 <Input 
                   value={formData.assignedToUserName || (formData as any).assigned_to_user_name}
                   onChange={(e) => setFormData({...formData, assignedToUserName: e.target.value})}
-                  className="bg-cyan-500/5 border-cyan-500/10 text-xs focus:border-cyan-500/40" 
+                  className="bg-background/50 border-border text-xs focus:border-primary/40" 
                   placeholder="e.g., SOC Admin"
                 />
               </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-border pt-4">
             <Button 
               variant="ghost" 
               onClick={() => setIsDialogOpen(false)}
-              className="text-[10px] uppercase font-bold hover:bg-white/5"
+              className="text-[10px] uppercase font-bold hover:bg-secondary/50"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSave}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold uppercase text-[10px] tracking-widest px-8"
+              className="bg-primary hover:opacity-90 text-white font-bold uppercase text-[10px] tracking-widest px-8 border-none"
             >
               <Save size={14} className="mr-2" />
               {currentRule ? 'Update Engine' : 'Deploy Rule'}

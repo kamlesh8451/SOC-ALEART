@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import { apiFetch } from '@/services/apiClient';
+import { cn } from '@/lib/utils';
 
 export const LoginView: React.FC = () => {
   const { login } = useAuth();
@@ -42,56 +43,56 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#050505] p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden transition-colors duration-500">
       {/* Futuristic Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-20 pointer-events-none">
-         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/20 blur-[120px] rounded-full" />
-         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full" />
+         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full" />
+         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 blur-[120px] rounded-full" />
       </div>
 
-      <Card className="w-full max-w-md bg-black/40 border-cyan-500/20 backdrop-blur-xl z-10 shadow-2xl shadow-cyan-500/5">
+      <Card className="w-full max-w-md bg-card/40 border-border/50 backdrop-blur-xl z-10 shadow-2xl transition-all">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-cyan-500/10 rounded-2xl flex items-center justify-center border border-cyan-500/30 shadow-lg shadow-cyan-500/20 group">
-            <Shield className="w-8 h-8 text-cyan-400 group-hover:scale-110 transition-transform" />
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/10 group">
+            <Shield className="w-8 h-8 text-primary group-hover:scale-110 transition-transform" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold tracking-tighter text-white uppercase">GuardianSOC</CardTitle>
-            <CardDescription className="text-cyan-500/60 font-mono text-[10px] uppercase tracking-widest mt-1">Enterprise Command Center v4.2</CardDescription>
+            <CardTitle className="text-2xl font-black tracking-tighter text-foreground uppercase">GuardianSOC</CardTitle>
+            <CardDescription className="text-primary/60 font-mono text-[10px] uppercase tracking-[0.2em] mt-1">Enterprise Command Center v5.0-PRO</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-bold text-cyan-500/70 tracking-tighter ml-1">Terminal ID (Email)</Label>
+              <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest ml-1">Terminal ID (Email)</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500/40" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
                 <Input 
                   type="email" 
                   placeholder="name@guardiansoc.local"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-black/50 border-cyan-500/20 text-white pl-10 h-12 focus:border-cyan-400/50 transition-all placeholder:text-cyan-500/20"
+                  className="bg-background/50 border-border text-foreground pl-10 h-12 focus:border-primary/50 transition-all placeholder:opacity-20"
                   required
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] uppercase font-bold text-cyan-500/70 tracking-tighter ml-1">Access Protocol (Password)</Label>
+              <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest ml-1">Access Protocol (Password)</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500/40" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
                 <Input 
                   type="password" 
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-black/50 border-cyan-500/20 text-white pl-10 h-12 focus:border-cyan-400/50 transition-all placeholder:text-cyan-500/20"
+                  className="bg-background/50 border-border text-foreground pl-10 h-12 focus:border-primary/50 transition-all placeholder:opacity-20"
                   required
                 />
               </div>
             </div>
             <Button 
               type="submit" 
-              className="w-full bg-cyan-600 hover:bg-cyan-500 text-white h-12 font-bold uppercase tracking-widest text-xs transition-all shadow-lg shadow-cyan-600/20"
+              className="w-full bg-primary hover:opacity-90 text-white h-12 font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-primary/10"
               disabled={loading}
             >
               {loading ? (
@@ -100,8 +101,8 @@ export const LoginView: React.FC = () => {
                 "Authorize Access"
               )}
             </Button>
-            <div className="text-center">
-               <p className="text-[9px] text-cyan-500/30 uppercase tracking-tighter">Authorized personnel only. All access is logged and monitored.</p>
+            <div className="text-center pt-2">
+               <p className="text-[9px] text-muted-foreground/30 uppercase tracking-tighter font-bold">Authorized personnel only. All access is logged and monitored.</p>
             </div>
           </form>
         </CardContent>

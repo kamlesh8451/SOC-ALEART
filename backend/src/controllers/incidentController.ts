@@ -80,10 +80,29 @@ async function generateUniqueTicketNumber(): Promise<string> {
 }
 
 export const incidentController = {
-  async getAll(_req: Request, res: Response, next: NextFunction) {
+  async getAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await pool.query('SELECT * FROM incidents ORDER BY detection_time DESC');
-      res.json(result.rows.map(mapIncident));
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = (page - 1) * limit;
+
+      const countRes = await pool.query('SELECT COUNT(*)::int as total FROM incidents');
+      const total = countRes.rows[0].total;
+
+      const result = await pool.query(
+        'SELECT * FROM incidents ORDER BY detection_time DESC LIMIT $1 OFFSET $2',
+        [limit, offset]
+      );
+      
+      res.json({
+        data: result.rows.map(mapIncident),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
     } catch (err) {
       next(err);
     }
@@ -186,6 +205,18 @@ export const incidentController = {
             ai_insights: aiInsights
           }, 'alert', userRes.rows[0].email);
         }
+
+        // Persistent database notification
+        await pool.query(
+          'INSERT INTO notifications (user_id, title, message, type, link) VALUES ($1, $2, $3, $4, $5)',
+          [
+            assignedToUserId,
+            `New ${data.severity.toUpperCase()} Incident`,
+            `${ticketNumber}: ${data.alertName} on ${data.host}`,
+            data.severity === 'critical' ? 'error' : (data.severity === 'high' ? 'warning' : 'info'),
+            `/incidents?id=${id}`
+          ]
+        );
       }
 
       res.status(201).json({
@@ -197,6 +228,9 @@ export const incidentController = {
         assignedToUserId: assignedToUserId || null,
         aiInsights
       });
+
+      // Refresh stats view
+      pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats_mv').catch(err => console.error('[ERR] MV Refresh failed:', err.message));
 
       // Emit real-time update
       SocketService.emit('incidents_updated', { type: 'CREATED' });
@@ -244,6 +278,9 @@ export const incidentController = {
         `Incident deleted manually`,
         req.headers['x-user-id'] as string
       );
+
+      // Refresh stats view
+      pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats_mv').catch(err => console.error('[ERR] MV Refresh failed:', err.message));
 
       // Emit real-time update
       SocketService.emit('incidents_updated', { type: 'DELETED' });
@@ -306,6 +343,8 @@ export const incidentController = {
       
       try {
         await pool.query(query, values);
+        // Refresh stats view
+        pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats_mv').catch(err => console.error('[ERR] MV Refresh failed:', err.message));
       } catch (dbErr: any) {
         console.error('[ERR] SQL Update Failed:', dbErr.message);
         return res.status(500).json({ 
@@ -345,6 +384,9 @@ export const incidentController = {
 
       await pool.query('DELETE FROM incidents WHERE id = ANY($1)', [ids]);
       
+      // Refresh stats view
+      pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats_mv').catch(err => console.error('[ERR] MV Refresh failed:', err.message));
+
       await auditService.logAction(
         'BULK_DELETE_INCIDENTS',
         undefined,
@@ -386,6 +428,9 @@ export const incidentController = {
 
       await pool.query(query, params);
 
+      // Refresh stats view
+      pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats_mv').catch(err => console.error('[ERR] MV Refresh failed:', err.message));
+
       await auditService.logAction(
         'BULK_UPDATE_STATUS',
         undefined,
@@ -410,7 +455,7 @@ export const incidentController = {
           AVG(acknowledged_at - detection_time) / 1000 / 60 as avg_mtta_minutes,
           AVG(resolved_at - acknowledged_at) / 1000 / 60 / 60 as avg_mttr_hours
         FROM incidents
-        WHERE acknowledged_at IS NOT NULL AND TRIM(status) NOT ILIKE 'open'
+        WHERE acknowledged_at IS NOT NULL AND TRIM(status) NOT ILIKE 'closed'
       `);
 
       const stats = result.rows[0];
@@ -450,27 +495,8 @@ export const incidentController = {
 
   async getStats(_req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('[DEBUG] Tactical Command telemetry sync started...');
-      const statsRes = await pool.query(`
-        SELECT 
-          COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'open') as open_count,
-          COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'investigating') as investigating_count,
-          COUNT(*) FILTER (WHERE TRIM(status) ILIKE 'closed') as closed_count,
-          
-          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'critical' AND TRIM(status) NOT ILIKE 'closed') as critical_open,
-          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'high' AND TRIM(status) NOT ILIKE 'closed') as high_open,
-          COUNT(*) FILTER (WHERE (TRIM(severity) ILIKE 'medium' OR TRIM(severity) ILIKE 'TEST') AND TRIM(status) NOT ILIKE 'closed') as medium_open,
-          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'low' AND TRIM(status) NOT ILIKE 'closed') as low_open,
-          
-          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'critical' AND TRIM(status) ILIKE 'closed') as critical_closed,
-          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'high' AND TRIM(status) ILIKE 'closed') as high_closed,
-          COUNT(*) FILTER (WHERE (TRIM(severity) ILIKE 'medium' OR TRIM(severity) ILIKE 'TEST') AND TRIM(status) ILIKE 'closed') as medium_closed,
-          COUNT(*) FILTER (WHERE TRIM(severity) ILIKE 'low' AND TRIM(status) ILIKE 'closed') as low_closed,
-          
-          COUNT(*) FILTER (WHERE TRIM(status) NOT ILIKE 'closed') as active_threats,
-          COUNT(*) as total_count
-        FROM incidents
-      `);
+      console.log('[DEBUG] Tactical Command telemetry sync started (using Materialized View)...');
+      const statsRes = await pool.query('SELECT * FROM dashboard_stats_mv');
 
       const velocityRes = await pool.query(`
         SELECT 
@@ -484,10 +510,10 @@ export const incidentController = {
       `);
 
       const stats = statsRes.rows[0] || {};
-      console.log('[DEBUG] Raw Aggregated Stats:', JSON.stringify(stats));
+      console.log('[DEBUG] Aggregated Stats (MV):', JSON.stringify(stats));
       
       const payload = {
-        version: '5.3.0-ROBUST-AGGREGATION',
+        version: '5.4.0-OPTIMIZED-MV',
         open: parseInt(stats.open_count || '0'),
         investigating: parseInt(stats.investigating_count || '0'),
         closed: parseInt(stats.closed_count || '0'),
@@ -515,7 +541,6 @@ export const incidentController = {
         }))
       };
 
-      console.log('[DEBUG] Payload for Delivery:', JSON.stringify(payload));
       res.json(payload);
     } catch (err: any) {
       console.error('[CRIT] Stats engine failure:', err.message);
@@ -744,16 +769,54 @@ export const incidentController = {
       const { q } = req.query;
       if (!q) return res.json([]);
 
-      const queryStr = `
-        SELECT * FROM incidents 
-        WHERE ticket_number ILIKE $1 
-        OR alert_name ILIKE $1 
-        OR host ILIKE $1 
-        OR description ILIKE $1 
-        ORDER BY detection_time DESC 
-        LIMIT 50
-      `;
-      const result = await pool.query(queryStr, [`%${q}%`]);
+      const searchStr = (q as string).trim();
+      let queryStr = 'SELECT * FROM incidents WHERE 1=1';
+      const params: unknown[] = [];
+      let paramCount = 1;
+
+      // Tokenizer for key:value pairs and free text
+      // Handles quotes for values with spaces: severity:"high priority"
+      const tokenRegex = /(?:([a-zA-Z0-9_]+):(?:"([^"]+)"|([^" ]+)))|([^ ]+)/g;
+      let match;
+      let hasTokens = false;
+
+      while ((match = tokenRegex.exec(searchStr)) !== null) {
+        if (match[1]) {
+          // Key-Value pair
+          hasTokens = true;
+          const key = match[1].toLowerCase();
+          const value = match[2] || match[3];
+          
+          const validKeys = ['severity', 'status', 'host', 'ticket_number', 'domain', 'assigned_to'];
+          if (validKeys.includes(key)) {
+            queryStr += ` AND ${key} ILIKE $${paramCount}`;
+            params.push(`%${value}%`);
+            paramCount++;
+          }
+        } else if (match[4] && match[4].toUpperCase() !== 'AND') {
+          // Free text
+          hasTokens = true;
+          queryStr += ` AND (ticket_number ILIKE $${paramCount} OR alert_name ILIKE $${paramCount} OR host ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
+          params.push(`%${match[4]}%`);
+          paramCount++;
+        }
+      }
+
+      // Fallback for simple keyword search if parsing yielded nothing structured
+      if (!hasTokens) {
+        queryStr = `
+          SELECT * FROM incidents 
+          WHERE ticket_number ILIKE $1 
+          OR alert_name ILIKE $1 
+          OR host ILIKE $1 
+          OR description ILIKE $1 
+        `;
+        params.push(`%${searchStr}%`);
+      }
+
+      queryStr += ' ORDER BY detection_time DESC LIMIT 50';
+
+      const result = await pool.query(queryStr, params);
       res.json(result.rows.map(mapIncident));
     } catch (err) {
       next(err);

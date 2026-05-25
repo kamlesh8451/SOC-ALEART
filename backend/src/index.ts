@@ -16,6 +16,8 @@ import mailRoutes from './routes/mailRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import reportRoutes from './routes/reportRoutes';
 import slaRoutes from './routes/slaRoutes';
+import notificationRoutes from './routes/notificationRoutes';
+import emailTemplateRoutes from './routes/emailTemplateRoutes';
 import { errorHandler, authenticate } from './middleware/auth';
 import { slaService } from './services/slaService';
 import { EmailIngestionService } from './services/EmailIngestionService';
@@ -46,8 +48,10 @@ const projectRoot = path.resolve(backendRoot, '..');
 
 dotenv.config({ path: path.join(backendRoot, '.env') });
 
-// Force allow self-signed certs for Aiven/Local dev
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+// Force allow self-signed certs for Aiven/Local dev only
+if (process.env.NODE_ENV !== 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -82,6 +86,7 @@ app.use((req, res, next) => {
 
 app.use('/uploads', express.static(path.join(backendRoot, 'uploads')));
 
+app.use('/api/templates', authenticate, emailTemplateRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/incidents', authenticate, incidentRoutes);
 app.use('/api/users', authenticate, userRoutes);
@@ -93,17 +98,7 @@ app.use('/api/mail', authenticate, mailRoutes);
 app.use('/api/settings', authenticate, settingsRoutes);
 app.use('/api/reports', authenticate, reportRoutes);
 app.use('/api/sla', authenticate, slaRoutes);
-
-app.post('/api/notifications/simulate-email', (req, res) => {
-  try {
-    const { incident, type } = req.body;
-    const email = buildNotificationEmail(incident, type || 'alert');
-    res.json(email);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Notification failed';
-    res.status(400).json({ error: message });
-  }
-});
+app.use('/api/notifications', authenticate, notificationRoutes);
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -170,6 +165,63 @@ async function ensureSchemaCompatibility() {
     await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS send_notifications BOOLEAN DEFAULT TRUE");
     await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS conditions JSONB DEFAULT '[]'::jsonb");
     await pool.query("ALTER TABLE assignment_rules ADD COLUMN IF NOT EXISTS matching_strategy TEXT DEFAULT 'contains'");
+
+    await pool.query("ALTER TABLE mailbox_settings ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP WITH TIME ZONE");
+    await pool.query("ALTER TABLE mailbox_settings ADD COLUMN IF NOT EXISTS last_sync_status TEXT DEFAULT 'UNKNOWN'");
+    await pool.query("ALTER TABLE mailbox_settings ADD COLUMN IF NOT EXISTS last_error TEXT");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Insert default templates if they don't exist
+    const defaultTemplates = [
+      {
+        id: 'incident_alert',
+        name: 'New Incident Alert',
+        subject: '🚨 SOC ALERT: {{ticketNumber}} - {{severity}} Priority',
+        body: `
+          <div style="font-family: sans-serif; padding: 20px; color: #1e293b; background: #f8fafc;">
+            <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+              <div style="background: #0f172a; color: #ffffff; padding: 20px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px;">GuardianSOC</h1>
+                <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.7;">SECURITY OPERATIONS CENTER</p>
+              </div>
+              <div style="padding: 30px;">
+                <h2 style="margin: 0 0 20px; font-size: 18px; color: #ef4444;">NEW TACTICAL ALERT DETECTED</h2>
+                <div style="background: #f1f5f9; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+                  <p style="margin: 0 0 10px;"><strong>TICKET:</strong> {{ticketNumber}}</p>
+                  <p style="margin: 0 0 10px;"><strong>ALERT:</strong> {{alertName}}</p>
+                  <p style="margin: 0 0 10px;"><strong>SEVERITY:</strong> <span style="color: #ef4444; font-weight: bold;">{{severity}}</span></p>
+                  <p style="margin: 0;"><strong>TARGET:</strong> {{host}}</p>
+                </div>
+                <div style="margin-bottom: 25px;">
+                  <h3 style="font-size: 14px; margin: 0 0 10px;">TACTICAL NARRATIVE</h3>
+                  <p style="font-size: 14px; color: #475569; line-height: 1.6;">{{description}}</p>
+                </div>
+                <a href="{{appUrl}}/incidents?id={{incidentId}}" style="display: inline-block; background: #3b82f6; color: #ffffff; padding: 12px 25px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 14px;">INVESTIGATE NOW</a>
+              </div>
+              <div style="background: #f8fafc; padding: 15px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b;">
+                This is an automated operational communication. Do not reply directly to this node.
+              </div>
+            </div>
+          </div>
+        `
+      }
+    ];
+
+    for (const template of defaultTemplates) {
+      await pool.query(
+        'INSERT INTO email_templates (id, name, subject, body) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
+        [template.id, template.name, template.subject, template.body]
+      );
+    }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS audit_logs (
